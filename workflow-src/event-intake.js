@@ -18,6 +18,7 @@ if(x.action==='events'){
  x.event_payload={schema_version:'1.0',events:parsed.events,demo:x.mode==='Synthetic demo',asset_criticality:x.asset_criticality||'unknown',actor:x.actor};
 }
 if(x.action==='case'){
+ if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(x.assessment_id||'')))throw new Error('Enter the assessment ID shown in the report');
  const labels={'Under review':'under_review','Confirmed malicious activity':'confirmed_malicious','Confirmed benign activity':'confirmed_benign','Insufficient evidence':'insufficient_evidence','Duplicate investigation':'duplicate'};
  x.disposition=labels[x.disposition]||x.disposition;
  if(!Object.values(labels).includes(x.disposition))throw new Error('Choose an analyst disposition');

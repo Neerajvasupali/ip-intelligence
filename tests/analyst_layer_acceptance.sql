@@ -23,7 +23,7 @@ begin
  if (select conclusion->>'assessment' from ipintel.assessments where id=sid)<>'conflicting_evidence' then raise exception 'Original conclusion changed';end if;
  begin update ipintel.assessments set rules_version='tampered' where id=sid;raise exception 'Mutation accepted';exception when others then if sqlerrm='Mutation accepted' then raise;end if;end;
  begin perform public.ipintel_api('case_update',jsonb_build_object('case_id',cid,'status','closed','disposition','confirmed_benign','note','Test'));raise exception 'Anonymous review accepted';exception when others then if sqlerrm='Anonymous review accepted' then raise;end if;end;
- r:=public.ipintel_api('case_update',jsonb_build_object('case_id',cid,'status','closed','disposition','confirmed_benign','note','Synthetic test decision only','actor',jsonb_build_object('id','synthetic-test-actor','name','Test reviewer','source','n8n_authenticated_user')));
+ r:=public.ipintel_api('case_update',jsonb_build_object('case_id',cid,'status','closed','disposition','confirmed_benign','note','Synthetic test decision only','assessment_id',r2->>'assessment_id','actor',jsonb_build_object('id','synthetic-test-actor','name','Test reviewer','source','n8n_authenticated_user')));
  if not (r->>'updated')::boolean then raise exception 'Attributed review failed';end if;
  if (select actor_id from ipintel.reviews where case_id=cid)<>'synthetic-test-actor' then raise exception 'Attribution failed';end if;
  begin update ipintel.reviews set explanation='tampered' where case_id=cid;raise exception 'Review mutation accepted';exception when others then if sqlerrm='Review mutation accepted' then raise;end if;end;

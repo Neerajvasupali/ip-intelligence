@@ -2,6 +2,8 @@
 
 ### Evidence before action.
 
+> The investigation-correctness update binds reviews to the displayed current assessment and adds account- and sequence-aware SSH priority. See [correctness release notes](docs/INVESTIGATION_CORRECTNESS.md).
+
 An IP investigation system built as **one n8n workflow**, with hosted Supabase persistence and three intelligence providers. It turns a submitted IP into attributable evidence, a versioned automated assessment, and a separate analyst decision.
 
 **58 nodes · 3 providers · Reputation rules v2.0 · One unified workflow**

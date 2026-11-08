@@ -12,8 +12,8 @@ def sql(value):
 def literal(value):return "'"+json.dumps(value).replace("'","''")+"'::jsonb"
 try:
  subprocess.run(['sudo','-n','docker','run','-d','--name',name,'--network','none','-e','POSTGRES_HOST_AUTH_METHOD=trust','postgres:17-alpine'],check=True,capture_output=True)
- for _ in range(40):
-  if subprocess.run(['sudo','-n','docker','exec',name,'pg_isready','-U','postgres'],capture_output=True).returncode==0:break
+ for _ in range(120):
+  if subprocess.run(['sudo','-n','docker','exec',name,'pg_isready','-h','127.0.0.1','-U','postgres'],capture_output=True).returncode==0:break
   time.sleep(.25)
  sql('create role anon;create role authenticated;create role service_role;')
  for path in sorted((ROOT/'supabase/migrations').glob('*.sql')):sql(path.read_text())
@@ -22,7 +22,7 @@ try:
  replay=json.loads(sql("select public.ipintel_api('events_ingest',"+literal(payload)+');'));assert replay['inserted']==0 and replay['duplicates']==3
  assert sql('select count(*) from ipintel.jobs;')=='0'
  report=json.loads(sql("select public.ipintel_api('report',"+literal({'case_id':cid})+');'));assert report['event_context']['priority']=='medium'
- review={'case_id':cid,'status':'closed','disposition':'insufficient_evidence','note':'Synthetic exercise: failed logins alone do not establish compromise. No live reputation evidence was requested.','actor':payload['actor']}
+ review={'case_id':cid,'assessment_id':report['assessment_id'],'status':'closed','disposition':'insufficient_evidence','note':'Synthetic exercise: failed logins alone do not establish compromise. No live reputation evidence was requested.','actor':payload['actor']}
  sql("select public.ipintel_api('case_update',"+literal(review)+');')
  report=json.loads(sql("select public.ipintel_api('report',"+literal({'case_id':cid})+');'));assert len(report['analyst_reviews'])==1
  (a.output/'report.json').write_text(json.dumps(report,indent=2)+'\n')

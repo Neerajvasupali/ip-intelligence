@@ -1,0 +1,32 @@
+begin;
+do $$
+declare payload jsonb; r jsonb; cid uuid; old_id text; current_id text; review jsonb; initial_reviews int;
+begin
+ payload:='{"schema_version":"1.0","demo":true,"actor":{"source":"n8n_authenticated_user","id":"correctness-fixture"},"events":[]}';
+ payload:=jsonb_set(payload,'{events}',(select jsonb_agg(jsonb_build_object('source','correctness','event_id','failure-'||n,'occurred_at','2026-01-01T10:0'||n||':00Z','event_type','ssh_authentication','source_ip','192.0.2.50','asset_id','server','account','alice','outcome','failure')) from generate_series(1,3)n));
+ r:=public.ipintel_api('events_ingest',payload);cid:=(r->'case_ids'->>0)::uuid;
+ r:=public.ipintel_api('report',jsonb_build_object('case_id',cid));old_id:=r->>'assessment_id';
+ if r->'event_context'->>'priority'<>'medium' then raise exception 'Failure-only priority wrong';end if;
+ payload:=jsonb_set(payload,'{events}','[{"source":"correctness","event_id":"success","occurred_at":"2026-01-01T10:04:00Z","event_type":"ssh_authentication","source_ip":"192.0.2.50","asset_id":"server","account":"alice","outcome":"success"}]');
+ perform public.ipintel_api('events_ingest',payload);
+ r:=public.ipintel_api('report',jsonb_build_object('case_id',cid));current_id:=r->>'assessment_id';
+ if r->'event_context'->>'priority'<>'high' or not (r->'event_context'->>'same_account_success_after_failures')::boolean then raise exception 'Same-account sequence missed';end if;
+ review:=jsonb_build_object('case_id',cid,'assessment_id',old_id,'status','closed','disposition','insufficient_evidence','note','Synthetic review explanation','actor',payload->'actor');
+ begin perform public.ipintel_api('case_update',review);raise exception 'Stale review accepted';exception when others then if sqlerrm='Stale review accepted' then raise;end if;end;
+ if exists(select 1 from ipintel.reviews where case_id=cid) or (select status from ipintel.cases where id=cid)<>'open' then raise exception 'Rejected review changed state';end if;
+ begin perform public.ipintel_api('case_update',review-'assessment_id');raise exception 'Missing snapshot accepted';exception when others then if sqlerrm='Missing snapshot accepted' then raise;end if;end;
+ begin perform public.ipintel_api('case_update',review||jsonb_build_object('assessment_id',gen_random_uuid()));raise exception 'Wrong snapshot accepted';exception when others then if sqlerrm='Wrong snapshot accepted' then raise;end if;end;
+ perform public.ipintel_api('case_update',review||jsonb_build_object('assessment_id',current_id));
+ if (select assessment_id::text from ipintel.reviews where case_id=cid)<>current_id then raise exception 'Review references wrong snapshot';end if;
+ update ipintel.events set occurred_at='2026-01-01T10:00:00Z' where case_id=cid and outcome='success';
+ if ipintel.event_context(cid)->>'priority'<>'medium' then raise exception 'Earlier success incorrectly elevated';end if;
+ update ipintel.events set occurred_at='2026-01-01T10:04:00Z',raw=jsonb_set(raw,'{account}','"bob"') where case_id=cid and outcome='success';
+ if ipintel.event_context(cid)->>'priority'<>'medium' then raise exception 'Different account incorrectly elevated';end if;
+ update ipintel.events set raw=raw-'account' where case_id=cid;
+ if ipintel.event_context(cid)->>'priority'<>'medium' or (ipintel.event_context(cid)->>'missing_account_events')::int<>4 then raise exception 'Unknown account attribution wrong';end if;
+ update ipintel.event_groups set asset_criticality='critical' where case_id=cid;
+ if ipintel.event_context(cid)->>'priority'<>'high' then raise exception 'Critical asset rule lost';end if;
+ if has_function_privilege('anon','ipintel.event_api_v3(text,jsonb)','execute') then raise exception 'Private routing exposed';end if;
+end;$$;
+select 'passed' as investigation_correctness_acceptance;
+rollback;

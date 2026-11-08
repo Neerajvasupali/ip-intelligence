@@ -1,0 +1,27 @@
+{
+  "verified_at": "2026-11-08T14:42:50.095997+00:00",
+  "status": "tested_not_deployed",
+  "checks": [
+    "Seven migrations replayed in isolated PostgreSQL",
+    "Four transactional SQL suites passed",
+    "Workflow topology, all Code-node syntax and five form expressions passed",
+    "Actor provenance and HTML escaping tests passed",
+    "Isolated demo passed with exact assessment ID and zero provider requests"
+  ],
+  "new_cases": [
+    "Stale review rejected without state changes",
+    "Missing or wrong assessment rejected",
+    "Valid review uses supplied current assessment",
+    "Same-account failures before success elevate priority",
+    "Earlier success does not establish subsequent success",
+    "Different-account success does not establish attribution",
+    "Missing accounts remain uncertain",
+    "Critical asset rule preserved"
+  ],
+  "limits": [
+    "No production migration or authenticated browser run for this candidate",
+    "No multi-session concurrency benchmark",
+    "Global locks prioritize consistency over throughput",
+    "Human timing study remains unmeasured"
+  ]
+}

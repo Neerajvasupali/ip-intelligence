@@ -22,7 +22,7 @@ begin
  a:=public.ipintel_api('enqueue','{"ip":"4.2.2.2","request_key":"acceptance-cache"}');
  r:=public.ipintel_api('report',jsonb_build_object('case_id',a->>'case_id'));
  if not (r#>>'{sources,ipinfo,from_cache}')::boolean then raise exception 'Cache failed';end if;
- perform public.ipintel_api('case_update',jsonb_build_object('case_id',cid,'status','closed','owner','Acceptance test','disposition','insufficient_evidence','actor',jsonb_build_object('id','synthetic-test-reviewer','name','Acceptance test','source','n8n_authenticated_user'),'note','Verified synthetic result'));
+ perform public.ipintel_api('case_update',jsonb_build_object('case_id',cid,'assessment_id',(public.ipintel_api('report',jsonb_build_object('case_id',cid))->>'assessment_id'),'status','closed','owner','Acceptance test','disposition','insufficient_evidence','actor',jsonb_build_object('id','synthetic-test-reviewer','name','Acceptance test','source','n8n_authenticated_user'),'note','Verified synthetic result'));
  if (select status from ipintel.cases where id=cid)<>'closed' then raise exception 'Case update failed';end if;
  perform public.ipintel_api('enqueue','{"ip":"4.2.2.1","request_key":"acceptance-rate"}');
  update ipintel.providers set next_at=now()-interval '1 minute' where name='ipinfo';
