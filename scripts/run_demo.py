@@ -22,7 +22,7 @@ try:
  replay=json.loads(sql("select public.ipintel_api('events_ingest',"+literal(payload)+');'));assert replay['inserted']==0 and replay['duplicates']==3
  assert sql('select count(*) from ipintel.jobs;')=='0'
  report=json.loads(sql("select public.ipintel_api('report',"+literal({'case_id':cid})+');'));assert report['event_context']['priority']=='medium'
- review={'case_id':cid,'status':'closed','disposition':'insufficient_evidence','note':'Synthetic exercise: failed logins alone do not establish compromise. No live reputation evidence was requested.','actor':payload['actor']}
+ review={'case_id':cid,'assessment_id':report['assessment_id'],'status':'closed','disposition':'insufficient_evidence','note':'Synthetic exercise: failed logins alone do not establish compromise. No live reputation evidence was requested.','actor':payload['actor']}
  sql("select public.ipintel_api('case_update',"+literal(review)+');')
  report=json.loads(sql("select public.ipintel_api('report',"+literal({'case_id':cid})+');'));assert len(report['analyst_reviews'])==1
  (a.output/'report.json').write_text(json.dumps(report,indent=2)+'\n')
