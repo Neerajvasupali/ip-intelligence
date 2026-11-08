@@ -1,0 +1,48 @@
+begin;
+do $$
+declare p jsonb; r jsonb; cid uuid; report1 jsonb; report2 jsonb; j int; e jsonb; total int;
+begin
+ p:='{"schema_version":"1.0","demo":true,"actor":{"source":"n8n_authenticated_user","id":"acceptance-fixture"},"events":[{"source":"acceptance","event_id":"one","occurred_at":"2026-01-01T10:00:00Z","event_type":"ssh_authentication","source_ip":"192.0.2.10","asset_id":"server","outcome":"failure"}]}';
+ select count(*) into j from ipintel.jobs;
+ r:=public.ipintel_api('events_preview',p);
+ if not (r->>'can_import')::boolean or exists(select 1 from ipintel.events where source='acceptance') then raise exception 'Preview writes or rejects valid input';end if;
+ r:=public.ipintel_api('events_ingest',p);cid:=(r->'case_ids'->>0)::uuid;
+ if (r->>'inserted')::int<>1 then raise exception 'Import failed';end if;
+ r:=public.ipintel_api('events_ingest',p);
+ if (r->>'duplicates')::int<>1 or (select count(*) from ipintel.jobs)<>j then raise exception 'Duplicate or demo made jobs';end if;
+ r:=public.ipintel_api('events_ingest',jsonb_set(p,'{events,0,outcome}','"success"'));
+ if (r->>'can_import')::boolean then raise exception 'Conflict accepted';end if;
+ report1:=public.ipintel_api('report',jsonb_build_object('case_id',cid));
+ e:=p->'events'->0;
+ p:=jsonb_set(p,'{events}',jsonb_build_array(e||'{"event_id":"two","occurred_at":"2026-01-01T10:01:00Z"}',e||'{"event_id":"three","occurred_at":"2026-01-01T10:02:00Z"}'));
+ r:=public.ipintel_api('events_ingest',p);
+ if r->'case_ids'<>jsonb_build_array(cid) then raise exception 'Related events not grouped';end if;
+ report2:=public.ipintel_api('report',jsonb_build_object('case_id',cid));
+ if report2->'event_context'->>'priority'<>'medium' or report2->>'assessment_id'=report1->>'assessment_id' then raise exception 'Context/assessment not updated';end if;
+ if (select count(*) from ipintel.assessments where case_id=cid)<>2 then raise exception 'Prior snapshot lost';end if;
+ p:=jsonb_set(p,'{events}',jsonb_build_array(e||'{"event_id":"boundary","occurred_at":"2026-01-01T10:15:00Z"}'));
+ r:=public.ipintel_api('events_ingest',p);
+ if r->'case_ids'=jsonb_build_array(cid) then raise exception 'Bucket boundary ignored';end if;
+ p:=jsonb_set(p,'{events}',jsonb_build_array(e||'{"event_id":"ok-before-invalid"}',e||'{"event_id":"bad","source_ip":"invalid"}'));
+ r:=public.ipintel_api('events_ingest',p);
+ if (r->>'can_import')::boolean or exists(select 1 from ipintel.events where event_id='ok-before-invalid') then raise exception 'Invalid batch partially committed';end if;
+ p:=jsonb_set(p,'{events}',jsonb_build_array(e||'{"event_id":"utc","occurred_at":"yesterday"}'));
+ if (public.ipintel_api('events_preview',p)->>'can_import')::boolean then raise exception 'Bad timestamp accepted';end if;
+ p:=jsonb_set(p,'{events}',jsonb_build_array(e));
+ if (public.ipintel_api('events_preview',p||'{"demo":false}')->>'can_import')::boolean then raise exception 'Documentation address accepted live';end if;
+ begin perform public.ipintel_api('events_ingest',p-'actor');raise exception 'Missing actor accepted';exception when others then if sqlerrm='Missing actor accepted' then raise;end if;end;
+ if has_function_privilege('anon','public.ipintel_api(text,jsonb)','execute') or has_table_privilege('authenticated','ipintel.events','select') then raise exception 'Backend exposed';end if;
+ update ipintel.cases set status='closed' where id=cid;
+ r:=public.ipintel_api('events_ingest',jsonb_set(p,'{events}',jsonb_build_array(e||'{"event_id":"after-close"}')));
+ if r->'case_ids'=jsonb_build_array(cid) then raise exception 'Closed case silently reopened';end if;
+ if (select count(*) from ipintel.jobs)<>j then raise exception 'Demo scheduled provider work';end if;
+ update ipintel.providers set enabled=true;
+ p:=jsonb_set(p,'{events}',jsonb_build_array(e||'{"source":"live-acceptance","event_id":"live-one","source_ip":"1.1.1.1"}',e||'{"source":"live-acceptance","event_id":"live-two","source_ip":"1.1.1.1"}'))||'{"demo":false}';
+ r:=public.ipintel_api('events_ingest',p);
+ if jsonb_array_length(r->'case_ids')<>1 or (select count(*) from ipintel.jobs)<>j+3 then raise exception 'Live grouping did not share provider jobs';end if;
+ r:=public.ipintel_api('events_ingest',p);
+ if (select count(*) from ipintel.jobs)<>j+3 or (r->>'duplicates')::int<>2 then raise exception 'Replay scheduled extra jobs';end if;
+
+end;$$;
+select 'passed' as event_investigations_acceptance;
+rollback;

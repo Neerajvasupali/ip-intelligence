@@ -1,5 +1,8 @@
 # Security model
 
+> The deployed baseline is described below. The event-investigation release candidate adds two private tables, event intake/confirmation and worklist branches; see [event release](EVENT_RELEASE.md) for its behavior and pending deployment gates.
+
+
 ## Trust boundaries
 
 The authenticated n8n portal is the user entry point. n8n invokes Supabase with a server-side backend credential and calls the three intelligence providers with credentials stored in n8n. Browser clients must never receive the backend secret.

@@ -460,7 +460,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d=$input.first().json;\nconst esc=v=>String(v??'—').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst date=v=>{if(!v)return 'Not available';const x=new Date(typeof v==='number'?v*1000:v);return Number.isNaN(x.getTime())?'Not available':x.toISOString().replace('T',' ').replace(/\\.\\d{3}Z$/,' UTC');};\nconst c=d.case||{},s=d.sources||{},a=s.abuseipdb||{},v=s.virustotal||{},i=s.ipinfo||{},ae=a.evidence||{},ve=v.evidence||{},ie=i.evidence||{},stats=ve.analysis_stats||{};\nconst flagged=Number(stats.malicious||0)+Number(stats.suspicious||0);\nlet title=({suspicious:'Review recommended',conflicting_evidence:'Conflicting evidence — review needed',isolated_signal:'Isolated signal — verify',cross_source_signals:'Signals across sources — investigate',multiple_vendor_signals:'Multiple vendor signals — review',abuse_signal:'Elevated abuse signal — investigate',outdated_evidence:'Evidence needs refreshing',pending:'Investigation in progress',inconclusive:'Evidence incomplete',no_known_malicious_evidence:'No known malicious evidence',not_found:'Investigation not found'})[d.assessment]||'Investigation report';\nlet summary=(d.reasons||[]).join(' ');\nif(v.status==='ok'&&flagged===1&&a.status==='ok'&&ae.abuse_confidence===0)summary='One VirusTotal vendor flagged this IP, while AbuseIPDB reports 0/100 abuse confidence. The sources disagree. Review the evidence before taking action; this is not a confirmed malicious verdict.';\nelse if(d.assessment==='suspicious')summary='One or more configured investigation rules found indicators that warrant review. Provider findings are evidence to investigate, not proof of malicious activity.';\nconst color=['suspicious','conflicting_evidence','isolated_signal','cross_source_signals','multiple_vendor_signals','abuse_signal'].includes(d.assessment)?'#92400e':d.assessment==='no_known_malicious_evidence'?'#065f46':'#334155';\nconst label=p=>({abuseipdb:'AbuseIPDB',virustotal:'VirusTotal',ipinfo:'IPinfo Lite'})[p]||p;\nconst status=x=>({ok:'Evidence available',not_found:'No report found',not_configured:'Not enabled',queued:'Queued',running:'Processing',rate_limited:'Rate limited',authentication_error:'Credential error',unavailable:'Unavailable',failed:'Lookup failed'})[x]||x||'Unknown';\nconst row=(k,val)=>'<tr><th style=\"text-align:left;padding:9px 12px;border-bottom:1px solid #e2e8f0;font-weight:500;color:#475569\">'+esc(k)+'</th><td style=\"padding:9px 12px;border-bottom:1px solid #e2e8f0\">'+esc(val)+'</td></tr>';\nconst table=rows=>'<table style=\"width:100%;border-collapse:collapse;font-size:14px\">'+rows+'</table>';\nconst card=(heading,body)=>'<section style=\"background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:16px 0\"><h2 style=\"font-size:18px;margin:0 0 14px\">'+esc(heading)+'</h2>'+body+'</section>';\nlet html='<main style=\"max-width:980px;margin:20px auto;padding:24px;font-family:system-ui,sans-serif;color:#0f172a;background:#f8fafc;border-radius:16px;line-height:1.6\">';\nhtml+='<p style=\"font-size:12px;letter-spacing:2px;color:#64748b\">IP INTELLIGENCE WORKSPACE</p><h1 style=\"font-size:30px;margin:8px 0\">Investigation: '+esc(c.ip||'Unknown IP')+'</h1>';\nhtml+='<section style=\"padding:18px;border-radius:10px;background:#f1f5f9;border-left:5px solid '+color+'\"><strong style=\"font-size:20px;color:'+color+'\">'+esc(title)+'</strong><p style=\"margin:8px 0\">'+esc(summary)+'</p></section>';\nif(d.found===false){html+='<p>Check the investigation ID and try again.</p></main>';return [{json:{...d,html}}];}\nhtml+=card('Investigation details',table(row('Investigation ID',c.id)+row('Case status',c.status)+row('Assigned analyst',c.owner_name||'Unassigned')+row('Reason',c.reason||'Not provided')+row('Created',date(c.created_at))+row('Report generated',date(d.generated_at))+row('Rules version',d.rules_version)+row('Evidence quality',d.evidence_quality)+row('Assessment ID',d.assessment_id)));\nhtml+=card('Network context',table(row('Network owner',ie.network_owner)+row('ASN',ie.asn)+row('Country code',ie.country))+ '<p style=\"font-size:13px;color:#64748b\">Network ownership and country are context, not reputation verdicts.</p>');\nlet findings='';\nfor(const [p,source] of Object.entries(s)){\n let rows=row('Lookup status',status(source.status));\n if(source.status==='ok'&&p==='virustotal')rows+=row('Vendors reporting malicious',stats.malicious??0)+row('Vendors reporting suspicious',stats.suspicious??0)+row('Vendors reporting harmless',stats.harmless??0)+row('Vendors with no detection',stats.undetected??0)+row('Vendor timeouts',stats.timeout??0)+row('Underlying analysis date',date(ve.last_analysis_date));\n if(source.status==='ok'&&p==='abuseipdb')rows+=row('Abuse confidence',String(ae.abuse_confidence??'—')+' / 100')+row('Reports in '+(ae.report_window_days||90)+' days',ae.total_reports)+row('Distinct reporters',ae.distinct_reporters)+row('Last abuse report',date(ae.last_reported_at));\n rows+=row('Retrieved',date(source.checked_at||source.retrieved_at))+row('Evidence source',source.from_cache?'Cached result':'Live lookup');\n findings+='<h3 style=\"font-size:16px;margin:18px 0 8px\">'+esc(label(p))+'</h3>'+table(rows);\n}\nfindings+='<p style=\"font-size:13px;color:#64748b\">Vendor results may overlap or contain false positives. “No detection” does not mean a vendor judged the IP harmless. Abuse report counts and abuse confidence are different measures.</p>';\nhtml+=card('Source findings',findings);\nif(d.age_warnings?.length)html+=card('Evidence freshness','<ul>'+d.age_warnings.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>');\nhtml+=card('Recommended next step','<p>'+esc(d.recommendation)+'</p><p>Reputation coverage: '+(d.coverage_complete?'Both reputation providers returned evidence.':'Some reputation evidence is missing.')+'</p>');\nconst dispositionLabels={under_review:'Under review',confirmed_malicious:'Confirmed malicious activity',confirmed_benign:'Confirmed benign activity',insufficient_evidence:'Insufficient evidence',duplicate:'Duplicate investigation'};\nhtml+=card('Analyst decisions',(d.analyst_reviews||[]).length?(d.analyst_reviews||[]).map(r=>'<article style=\"border-bottom:1px solid #e2e8f0;padding:12px 0\"><strong>'+esc(dispositionLabels[r.disposition]||r.disposition)+'</strong><p>'+esc(r.explanation)+'</p><small>Reviewed by '+esc(r.actor_name)+' · '+esc(date(r.created_at))+' · Case '+esc(r.case_status)+'</small></article>').join(''):'<p>No analyst decision recorded. The automated assessment is separate from a human decision. Choose case in the workspace to record your review.</p>');\nhtml+=card('Assessment history',(d.assessment_history||[]).map(a=>'<p><strong>'+esc(String(a.conclusion?.assessment||'').replaceAll('_',' '))+'</strong> · Rules '+esc(a.rules_version)+' · '+esc(date(a.created_at))+'<br><small>Assessment '+esc(a.id)+'</small></p>').join('')+'<p style=\"font-size:13px;color:#64748b\">Assessments retain their evidence and rule version. A changed conclusion is saved as another entry; earlier snapshots are preserved. Showing the latest 20 entries.</p>');\n\nhtml+=card('Activity history',(d.timeline||[]).map(t=>'<p><strong>'+esc(t.event.replaceAll('_',' '))+'</strong> · '+esc(date(t.created_at))+(t.details?.provider?' · '+esc(label(t.details.provider)):'')+(t.details?.note?'<br>'+esc(t.details.note):'')+'</p>').join('')||'<p>No activity recorded.</p>');\nhtml+='<details style=\"margin-top:20px\"><summary style=\"cursor:pointer\">Technical data (JSON)</summary><pre style=\"white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;background:#e2e8f0;font-size:12px\">'+esc(JSON.stringify(d,null,2))+'</pre></details>';\nhtml+='<p><a href=\"/form/ip-intelligence\" style=\"color:#2563eb\">Return to workspace</a></p></main>';\nreturn [{json:{...d,html}}];"
+        "jsCode": "const d=$input.first().json;\nconst esc=v=>String(v??'\u2014').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst date=v=>{if(!v)return 'Not available';const x=new Date(typeof v==='number'?v*1000:v);return Number.isNaN(x.getTime())?'Not available':x.toISOString().replace('T',' ').replace(/\\.\\d{3}Z$/,' UTC');};\nconst c=d.case||{},s=d.sources||{},a=s.abuseipdb||{},v=s.virustotal||{},i=s.ipinfo||{},ae=a.evidence||{},ve=v.evidence||{},ie=i.evidence||{},stats=ve.analysis_stats||{};\nconst flagged=Number(stats.malicious||0)+Number(stats.suspicious||0);\nlet title=({suspicious:'Review recommended',conflicting_evidence:'Conflicting evidence \u2014 review needed',isolated_signal:'Isolated signal \u2014 verify',cross_source_signals:'Signals across sources \u2014 investigate',multiple_vendor_signals:'Multiple vendor signals \u2014 review',abuse_signal:'Elevated abuse signal \u2014 investigate',outdated_evidence:'Evidence needs refreshing',pending:'Investigation in progress',inconclusive:'Evidence incomplete',no_known_malicious_evidence:'No known malicious evidence',not_found:'Investigation not found'})[d.assessment]||'Investigation report';\nlet summary=(d.reasons||[]).join(' ');\nif(v.status==='ok'&&flagged===1&&a.status==='ok'&&ae.abuse_confidence===0)summary='One VirusTotal vendor flagged this IP, while AbuseIPDB reports 0/100 abuse confidence. The sources disagree. Review the evidence before taking action; this is not a confirmed malicious verdict.';\nelse if(d.assessment==='suspicious')summary='One or more configured investigation rules found indicators that warrant review. Provider findings are evidence to investigate, not proof of malicious activity.';\nconst color=['suspicious','conflicting_evidence','isolated_signal','cross_source_signals','multiple_vendor_signals','abuse_signal'].includes(d.assessment)?'#92400e':d.assessment==='no_known_malicious_evidence'?'#065f46':'#334155';\nconst label=p=>({abuseipdb:'AbuseIPDB',virustotal:'VirusTotal',ipinfo:'IPinfo Lite'})[p]||p;\nconst status=x=>({ok:'Evidence available',not_found:'No report found',not_configured:'Not enabled',queued:'Queued',running:'Processing',rate_limited:'Rate limited',authentication_error:'Credential error',unavailable:'Unavailable',failed:'Lookup failed'})[x]||x||'Unknown';\nconst row=(k,val)=>'<tr><th style=\"text-align:left;padding:9px 12px;border-bottom:1px solid #e2e8f0;font-weight:500;color:#475569\">'+esc(k)+'</th><td style=\"padding:9px 12px;border-bottom:1px solid #e2e8f0\">'+esc(val)+'</td></tr>';\nconst table=rows=>'<table style=\"width:100%;border-collapse:collapse;font-size:14px\">'+rows+'</table>';\nconst card=(heading,body)=>'<section style=\"background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:16px 0\"><h2 style=\"font-size:18px;margin:0 0 14px\">'+esc(heading)+'</h2>'+body+'</section>';\nlet html='<main style=\"max-width:980px;margin:20px auto;padding:24px;font-family:system-ui,sans-serif;color:#0f172a;background:#f8fafc;border-radius:16px;line-height:1.6\">';\nhtml+='<p style=\"font-size:12px;letter-spacing:2px;color:#64748b\">IP INTELLIGENCE WORKSPACE</p><h1 style=\"font-size:30px;margin:8px 0\">Investigation: '+esc(c.ip||'Unknown IP')+'</h1>';\nhtml+='<section style=\"padding:18px;border-radius:10px;background:#f1f5f9;border-left:5px solid '+color+'\"><strong style=\"font-size:20px;color:'+color+'\">'+esc(title)+'</strong><p style=\"margin:8px 0\">'+esc(summary)+'</p></section>';\nif(d.found===false){html+='<p>Check the investigation ID and try again.</p></main>';return [{json:{...d,html}}];}\nhtml+=card('Investigation details',table(row('Investigation ID',c.id)+row('Case status',c.status)+row('Assigned analyst',c.owner_name||'Unassigned')+row('Reason',c.reason||'Not provided')+row('Created',date(c.created_at))+row('Report generated',date(d.generated_at))+row('Rules version',d.rules_version)+row('Evidence quality',d.evidence_quality)+row('Assessment ID',d.assessment_id)));\nconst context=d.event_context||{};\nif(Number(context.total)>0){\n html+=card('Security activity',table(row('Mode',context.demo?'SYNTHETIC DEMO \u2014 no live intelligence':'Live enrichment')+row('Asset',context.asset_id)+row('Declared asset criticality',context.asset_criticality)+row('Events',context.total)+row('Failures',context.failures)+row('Successes',context.successes)+row('Investigation priority',context.priority)+row('Priority reason',context.priority_reason)+row('Priority rules',context.priority_rules_version))+'<p>Priority describes observed activity and declared asset context. It is separate from IP reputation and is not proof of compromise.</p>');\n html+=card('Event timeline',(context.events||[]).map(e=>'<p><strong>'+esc(e.outcome)+'</strong> \u00b7 '+esc(date(e.occurred_at))+' \u00b7 '+esc(e.asset_id)+'<br><small>'+esc(e.source)+' / '+esc(e.event_id)+' \u00b7 Account '+esc(e.account||'not supplied')+'</small></p>').join(''));\n}\nhtml+=card('Network context',table(row('Network owner',ie.network_owner)+row('ASN',ie.asn)+row('Country code',ie.country))+ '<p style=\"font-size:13px;color:#64748b\">Network ownership and country are context, not reputation verdicts.</p>');\nlet findings='';\nfor(const [p,source] of Object.entries(s)){\n let rows=row('Lookup status',status(source.status));\n if(source.status==='ok'&&p==='virustotal')rows+=row('Vendors reporting malicious',stats.malicious??0)+row('Vendors reporting suspicious',stats.suspicious??0)+row('Vendors reporting harmless',stats.harmless??0)+row('Vendors with no detection',stats.undetected??0)+row('Vendor timeouts',stats.timeout??0)+row('Underlying analysis date',date(ve.last_analysis_date));\n if(source.status==='ok'&&p==='abuseipdb')rows+=row('Abuse confidence',String(ae.abuse_confidence??'\u2014')+' / 100')+row('Reports in '+(ae.report_window_days||90)+' days',ae.total_reports)+row('Distinct reporters',ae.distinct_reporters)+row('Last abuse report',date(ae.last_reported_at));\n rows+=row('Retrieved',date(source.checked_at||source.retrieved_at))+row('Evidence source',source.from_cache?'Cached result':'Live lookup');\n findings+='<h3 style=\"font-size:16px;margin:18px 0 8px\">'+esc(label(p))+'</h3>'+table(rows);\n}\nfindings+='<p style=\"font-size:13px;color:#64748b\">Vendor results may overlap or contain false positives. \u201cNo detection\u201d does not mean a vendor judged the IP harmless. Abuse report counts and abuse confidence are different measures.</p>';\nhtml+=card('Source findings',findings);\nif(d.age_warnings?.length)html+=card('Evidence freshness','<ul>'+d.age_warnings.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>');\nhtml+=card('Recommended next step','<p>'+esc(d.recommendation)+'</p><p>Reputation coverage: '+(d.coverage_complete?'Both reputation providers returned evidence.':'Some reputation evidence is missing.')+'</p>');\nconst dispositionLabels={under_review:'Under review',confirmed_malicious:'Confirmed malicious activity',confirmed_benign:'Confirmed benign activity',insufficient_evidence:'Insufficient evidence',duplicate:'Duplicate investigation'};\nhtml+=card('Analyst decisions',(d.analyst_reviews||[]).length?(d.analyst_reviews||[]).map(r=>'<article style=\"border-bottom:1px solid #e2e8f0;padding:12px 0\"><strong>'+esc(dispositionLabels[r.disposition]||r.disposition)+'</strong><p>'+esc(r.explanation)+'</p><small>Reviewed by '+esc(r.actor_name)+' \u00b7 '+esc(date(r.created_at))+' \u00b7 Case '+esc(r.case_status)+'</small></article>').join(''):'<p>No analyst decision recorded. The automated assessment is separate from a human decision. Choose case in the workspace to record your review.</p>');\nhtml+=card('Assessment history',(d.assessment_history||[]).map(a=>'<p><strong>'+esc(String(a.conclusion?.assessment||'').replaceAll('_',' '))+'</strong> \u00b7 Rules '+esc(a.rules_version)+' \u00b7 '+esc(date(a.created_at))+'<br><small>Assessment '+esc(a.id)+'</small></p>').join('')+'<p style=\"font-size:13px;color:#64748b\">Assessments retain their evidence and rule version. A changed conclusion is saved as another entry; earlier snapshots are preserved. Showing the latest 20 entries.</p>');\n\nhtml+=card('Activity history',(d.timeline||[]).map(t=>'<p><strong>'+esc(t.event.replaceAll('_',' '))+'</strong> \u00b7 '+esc(date(t.created_at))+(t.details?.provider?' \u00b7 '+esc(label(t.details.provider)):'')+(t.details?.note?'<br>'+esc(t.details.note):'')+'</p>').join('')||'<p>No activity recorded.</p>');\nhtml+='<details style=\"margin-top:20px\"><summary style=\"cursor:pointer\">Technical data (JSON)</summary><pre style=\"white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;background:#e2e8f0;font-size:12px\">'+esc(JSON.stringify(d,null,2))+'</pre></details>';\nhtml+='<p><a href=\"/form/ip-intelligence\" style=\"color:#2563eb\">Return to workspace</a></p></main>';\nreturn [{json:{...d,html}}];"
       },
       "id": "27b2060a-33de-4a1d-a9f3-a77e3c71792a",
       "name": "report - Render result",
@@ -840,6 +840,12 @@
                   },
                   {
                     "option": "case"
+                  },
+                  {
+                    "option": "events"
+                  },
+                  {
+                    "option": "worklist"
                   }
                 ]
               }
@@ -868,7 +874,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const initial=$('Investigation portal').first().json;\nconst x={...initial,...$input.first().json,action:initial.action,user:initial.user};\nconst u=initial.user;\nx.actor=u?.id?{id:String(u.id),name:[u.firstName,u.lastName].filter(Boolean).join(' ')||String(u.email||u.id),source:'n8n_authenticated_user'}:null;\nif(!['submit','report','case'].includes(x.action))throw new Error('Unsupported portal action');\nif(x.action==='submit'&&!x.ip)throw new Error('Enter a public IP');\nif(x.action!=='submit'&&!x.case_id)throw new Error('Enter the investigation ID');\nif(x.action==='case'){\n if(!x.actor)throw new Error('Sign in to the production portal to record an attributed analyst review. Manual test executions do not establish reviewer identity.');\n const labels={'Under review':'under_review','Confirmed malicious activity':'confirmed_malicious','Confirmed benign activity':'confirmed_benign','Insufficient evidence':'insufficient_evidence','Duplicate investigation':'duplicate'};\n x.disposition=labels[x.disposition]||x.disposition;\n if(!Object.values(labels).includes(x.disposition))throw new Error('Choose an analyst disposition');\n if(x.status==='closed'&&x.disposition==='under_review')throw new Error('Choose a final disposition before closing the case');\n if(String(x.note||'').trim().length<3)throw new Error('Explain your analyst decision');\n}\nreturn [{json:x}];"
+        "jsCode": "const initial=$('Investigation portal').first().json;\nconst x={...initial,...$input.first().json,action:initial.action,user:initial.user};\nconst u=initial.user;\nx.actor=u?.id?{id:String(u.id),name:[u.firstName,u.lastName].filter(Boolean).join(' ')||String(u.email||u.id),source:'n8n_authenticated_user'}:null;\nif(!['submit','report','case','events','worklist'].includes(x.action))throw new Error('Unsupported portal action');\nif(x.action==='submit'&&!x.ip)throw new Error('Enter a public IP');\nif(['report','case'].includes(x.action)&&!x.case_id)throw new Error('Enter the investigation ID');\nif(['events','worklist','case'].includes(x.action)&&!x.actor)throw new Error('Sign in to the production portal to perform this action.');\nif(x.action==='events'){\n let raw=String(x.events_json||'');\n const binary=$input.first().binary||{};\n const key=Object.keys(binary)[0];\n if(key){const buffer=await this.helpers.getBinaryDataBuffer(0,key);if(buffer.length>262144)throw new Error('File exceeds 256 KiB');if(raw.trim())throw new Error('Use either a file or pasted JSON, not both');raw=buffer.toString('utf8');}\n if(!raw.trim())throw new Error('Upload a JSON event file or paste its contents');\n if(raw.length>262144)throw new Error('Import too large');\n let parsed;try{parsed=JSON.parse(raw)}catch{throw new Error('Invalid JSON event file')}\n if(!parsed||Array.isArray(parsed)||parsed.schema_version!=='1.0'||!Array.isArray(parsed.events)||parsed.events.length<1||parsed.events.length>100)throw new Error('Expected schema_version 1.0 and 1\u2013100 events');\n x.event_payload={schema_version:'1.0',events:parsed.events,demo:x.mode==='Synthetic demo',asset_criticality:x.asset_criticality||'unknown',actor:x.actor};\n}\nif(x.action==='case'){\n const labels={'Under review':'under_review','Confirmed malicious activity':'confirmed_malicious','Confirmed benign activity':'confirmed_benign','Insufficient evidence':'insufficient_evidence','Duplicate investigation':'duplicate'};\n x.disposition=labels[x.disposition]||x.disposition;\n if(!Object.values(labels).includes(x.disposition))throw new Error('Choose an analyst disposition');\n if(x.status==='closed'&&x.disposition==='under_review')throw new Error('Choose a final disposition before closing the case');\n if(String(x.note||'').trim().length<3)throw new Error('Explain your analyst decision');\n}\nreturn [{json:x}];\n"
       },
       "id": "848c2ae1-508b-45fb-a89c-77447f8d8e92",
       "name": "Validate portal action",
@@ -1114,6 +1120,48 @@
                 ],
                 "combinator": "and"
               }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "events",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "worklist",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
             }
           ]
         },
@@ -1159,7 +1207,7 @@
     },
     {
       "parameters": {
-        "content": "## IP Intelligence — Combined System\nOne workflow, three entrances: Operator console, Investigation portal, Queue schedule.\n\nConsole action: demo (default), setup, ops, maintenance, enable. Set action in Console action, then execute Operator console.\n\nRun setup to produce Supabase SQL. Set the project URL once in System configuration. Attach one shared Supabase backend credential to RPC nodes. Add the three provider credentials in Enrich queued IP. Use enable to configure one provider at a time using enable - Provider choice.\n\nPortal actions: submit (IP and reason), report (case_id), case (case_id, status, owner and note).\n\nSupabase budgets, leases, caching, deduplication, retries and audit history are preserved. Credentials stay in n8n credentials, never input fields. All providers start disabled. Configure form access before exposing the portal. Live SQL/concurrency tests require credentials.\n\nThe earlier separate workflows are reference drafts; this combined workflow runs independently and does not call them.",
+        "content": "## IP Intelligence \u2014 Combined System\nOne workflow, three entrances: Operator console, Investigation portal, Queue schedule.\n\nConsole action: demo (default), setup, ops, maintenance, enable. Set action in Console action, then execute Operator console.\n\nRun setup to produce Supabase SQL. Set the project URL once in System configuration. Attach one shared Supabase backend credential to RPC nodes. Add the three provider credentials in Enrich queued IP. Use enable to configure one provider at a time using enable - Provider choice.\n\nPortal actions: submit (IP and reason), report (case_id), case (case_id, status, owner and note).\n\nSupabase budgets, leases, caching, deduplication, retries and audit history are preserved. Credentials stay in n8n credentials, never input fields. All providers start disabled. Configure form access before exposing the portal. Live SQL/concurrency tests require credentials.\n\nThe earlier separate workflows are reference drafts; this combined workflow runs independently and does not call them.",
         "height": 740,
         "width": 760
       },
@@ -1184,13 +1232,210 @@
       "parameters": {
         "operation": "page",
         "defineForm": "json",
-        "jsonOutput": "={{ JSON.stringify($json.action === 'submit' ? [{\"fieldLabel\":\"IP address\",\"fieldName\":\"ip\",\"fieldType\":\"text\",\"placeholder\":\"For example, 8.8.8.8\",\"requiredField\":true},{\"fieldLabel\":\"Reason for investigation (optional)\",\"fieldName\":\"reason\",\"fieldType\":\"textarea\",\"requiredField\":false}] : $json.action === 'report' ? [{\"fieldLabel\":\"Investigation ID\",\"fieldName\":\"case_id\",\"fieldType\":\"text\",\"placeholder\":\"Paste the ID returned when you submitted the IP\",\"requiredField\":true}] : [{\"fieldLabel\":\"Investigation ID\",\"fieldName\":\"case_id\",\"fieldType\":\"text\",\"requiredField\":true},{\"fieldLabel\":\"Case status\",\"fieldName\":\"status\",\"fieldType\":\"dropdown\",\"requiredField\":true,\"fieldOptions\":{\"values\":[{\"option\":\"open\"},{\"option\":\"investigating\"},{\"option\":\"closed\"}]}},{\"fieldLabel\":\"Analyst disposition\",\"fieldName\":\"disposition\",\"fieldType\":\"dropdown\",\"requiredField\":true,\"fieldOptions\":{\"values\":[{\"option\":\"Under review\"},{\"option\":\"Confirmed malicious activity\"},{\"option\":\"Confirmed benign activity\"},{\"option\":\"Insufficient evidence\"},{\"option\":\"Duplicate investigation\"}]}},{\"fieldLabel\":\"Assigned analyst (optional)\",\"fieldName\":\"owner\",\"fieldType\":\"text\",\"requiredField\":false},{\"fieldLabel\":\"Explain your decision\",\"fieldName\":\"note\",\"fieldType\":\"textarea\",\"requiredField\":true}]) }}",
+        "jsonOutput": "={{ JSON.stringify($json.action === \"events\" ? [{\"fieldLabel\": \"JSON event file (maximum 256 KiB, 100 records)\", \"fieldName\": \"events_file\", \"fieldType\": \"file\", \"multipleFiles\": false, \"acceptFileTypes\": \".json\", \"requiredField\": false}, {\"fieldLabel\": \"Or paste JSON event file\", \"fieldName\": \"events_json\", \"fieldType\": \"textarea\", \"requiredField\": false}, {\"fieldLabel\": \"Mode\", \"fieldName\": \"mode\", \"fieldType\": \"dropdown\", \"requiredField\": true, \"fieldOptions\": {\"values\": [{\"option\": \"Synthetic demo\"}, {\"option\": \"Live enrichment\"}]}}, {\"fieldLabel\": \"Asset criticality (declared context)\", \"fieldName\": \"asset_criticality\", \"fieldType\": \"dropdown\", \"requiredField\": true, \"fieldOptions\": {\"values\": [{\"option\": \"unknown\"}, {\"option\": \"standard\"}, {\"option\": \"critical\"}]}}] : $json.action === \"worklist\" ? [{\"fieldLabel\":\"Status filter (optional)\",\"fieldName\":\"status\",\"fieldType\":\"dropdown\",\"requiredField\":false,\"fieldOptions\":{\"values\":[{\"option\":\"open\"},{\"option\":\"investigating\"},{\"option\":\"closed\"}]}}] : ($json.action === 'submit' ? [{\"fieldLabel\":\"IP address\",\"fieldName\":\"ip\",\"fieldType\":\"text\",\"placeholder\":\"For example, 8.8.8.8\",\"requiredField\":true},{\"fieldLabel\":\"Reason for investigation (optional)\",\"fieldName\":\"reason\",\"fieldType\":\"textarea\",\"requiredField\":false}] : $json.action === 'report' ? [{\"fieldLabel\":\"Investigation ID\",\"fieldName\":\"case_id\",\"fieldType\":\"text\",\"placeholder\":\"Paste the ID returned when you submitted the IP\",\"requiredField\":true}] : [{\"fieldLabel\":\"Investigation ID\",\"fieldName\":\"case_id\",\"fieldType\":\"text\",\"requiredField\":true},{\"fieldLabel\":\"Case status\",\"fieldName\":\"status\",\"fieldType\":\"dropdown\",\"requiredField\":true,\"fieldOptions\":{\"values\":[{\"option\":\"open\"},{\"option\":\"investigating\"},{\"option\":\"closed\"}]}},{\"fieldLabel\":\"Analyst disposition\",\"fieldName\":\"disposition\",\"fieldType\":\"dropdown\",\"requiredField\":true,\"fieldOptions\":{\"values\":[{\"option\":\"Under review\"},{\"option\":\"Confirmed malicious activity\"},{\"option\":\"Confirmed benign activity\"},{\"option\":\"Insufficient evidence\"},{\"option\":\"Duplicate investigation\"}]}},{\"fieldLabel\":\"Assigned analyst (optional)\",\"fieldName\":\"owner\",\"fieldType\":\"text\",\"requiredField\":false},{\"fieldLabel\":\"Explain your decision\",\"fieldName\":\"note\",\"fieldType\":\"textarea\",\"requiredField\":true}])) }}",
         "options": {
-          "formTitle": "={{ $json.action === 'submit' ? 'Investigate an IP' : $json.action === 'report' ? 'View investigation report' : 'Update a case' }}",
+          "formTitle": "={{ $json.action === \"events\" ? \"Import security events\" : $json.action === \"worklist\" ? \"Investigation worklist\" : $json.action === \"submit\" ? \"Investigate an IP\" : $json.action === \"report\" ? \"View investigation report\" : \"Update a case\" }}",
           "formDescription": "={{ $json.action === 'case' ? 'Read the report first. Your decision links to its latest saved assessment and is attributed to your signed-in n8n account. Assignment is separate from reviewer identity.' : 'Complete the details below to continue.' }}",
           "buttonLabel": "Continue",
           "appendAttribution": false
         }
+      }
+    },
+    {
+      "id": "a63e275a-beaa-4b76-aa2b-313e59d7d17b",
+      "name": "events - Preview import",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3600,
+        1900
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({action:\"events_preview\",payload:$(\"System configuration\").first().json.event_payload}) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "575679bb-7602-4bd3-be81-dfdffcb92565",
+      "name": "events - Render preview",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3820,
+        1900
+      ],
+      "parameters": {
+        "jsCode": "const d=$input.first().json;\nconst esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst rows=(d.rows||[]).map(r=>'<tr><td>'+esc(r.index+1)+'</td><td>'+esc(r.status)+'</td><td>'+esc((r.errors||[]).join('; '))+'</td></tr>').join('');\nlet html='<main style=\"max-width:920px;margin:24px auto;font-family:system-ui;line-height:1.7\"><h1>'+(d.preview_only?'Import preview':'Import result')+'</h1><p>'+(d.demo?'Synthetic demo: live provider calls disabled.':'Live enrichment: provider jobs use configured budgets and cache.')+'</p>';\nif(d.inserted!==undefined)html+='<p>Events recorded: '+esc(d.inserted)+' \u00b7 Duplicate deliveries: '+esc(d.duplicates)+'</p>';\nif(d.can_import===false)html+='<p>Import rejected. Correct every rejected row; no events from this batch were saved.</p>';\nhtml+='<table style=\"width:100%;text-align:left\"><thead><tr><th>Row</th><th>Status</th><th>Validation errors</th></tr></thead><tbody>'+rows+'</tbody></table>';\nhtml+=(d.case_ids||[]).length?'<h2>Investigations</h2><ul>'+d.case_ids.map(id=>'<li><code>'+esc(id)+'</code></li>').join('')+'</ul><p>Choose report in the workspace to view an investigation, then case to record a review.</p>':'';\nhtml+='<p><a href=\"/form/ip-intelligence\">Return to workspace</a></p></main>';\nreturn [{json:{...d,html}}];\n"
+      }
+    },
+    {
+      "id": "cd45b118-88e7-4860-9012-35628e8087f9",
+      "name": "events - Confirm import",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        4040,
+        1900
+      ],
+      "parameters": {
+        "operation": "page",
+        "defineForm": "json",
+        "jsonOutput": "={{ JSON.stringify([{fieldType:\"html\",elementName:\"preview\",html:$json.html},{fieldLabel:\"Import these validated events?\",fieldName:\"confirmation\",fieldType:\"dropdown\",requiredField:true,fieldOptions:{values:[{option:\"No \u2014 preview only\"},{option:\"Yes \u2014 import\"}]}}]) }}",
+        "options": {
+          "formTitle": "Review event import",
+          "appendAttribution": false
+        }
+      }
+    },
+    {
+      "id": "e3632769-ffe6-4c78-bbc1-aea9e576045e",
+      "name": "events - Prepare confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4260,
+        1900
+      ],
+      "parameters": {
+        "jsCode": "const original=$(\"System configuration\").first().json;const yes=$input.first().json.confirmation===\"Yes \u2014 import\";return [{json:{request_action:yes?\"events_ingest\":\"events_preview\",event_payload:original.event_payload}}];"
+      }
+    },
+    {
+      "id": "a1d49a55-7676-4dd9-9294-ead16e9b03bf",
+      "name": "events - Commit confirmed import",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        4480,
+        1900
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({action:$json.request_action,payload:$json.event_payload}) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "a61a9ec9-1ede-4afd-8d09-6f733c5abe5c",
+      "name": "events - Render receipt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4700,
+        1900
+      ],
+      "parameters": {
+        "jsCode": "const d=$input.first().json;\nconst esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst rows=(d.rows||[]).map(r=>'<tr><td>'+esc(r.index+1)+'</td><td>'+esc(r.status)+'</td><td>'+esc((r.errors||[]).join('; '))+'</td></tr>').join('');\nlet html='<main style=\"max-width:920px;margin:24px auto;font-family:system-ui;line-height:1.7\"><h1>'+(d.preview_only?'Import preview':'Import result')+'</h1><p>'+(d.demo?'Synthetic demo: live provider calls disabled.':'Live enrichment: provider jobs use configured budgets and cache.')+'</p>';\nif(d.inserted!==undefined)html+='<p>Events recorded: '+esc(d.inserted)+' \u00b7 Duplicate deliveries: '+esc(d.duplicates)+'</p>';\nif(d.can_import===false)html+='<p>Import rejected. Correct every rejected row; no events from this batch were saved.</p>';\nhtml+='<table style=\"width:100%;text-align:left\"><thead><tr><th>Row</th><th>Status</th><th>Validation errors</th></tr></thead><tbody>'+rows+'</tbody></table>';\nhtml+=(d.case_ids||[]).length?'<h2>Investigations</h2><ul>'+d.case_ids.map(id=>'<li><code>'+esc(id)+'</code></li>').join('')+'</ul><p>Choose report in the workspace to view an investigation, then case to record a review.</p>':'';\nhtml+='<p><a href=\"/form/ip-intelligence\">Return to workspace</a></p></main>';\nreturn [{json:{...d,html}}];\n"
+      }
+    },
+    {
+      "id": "1d046405-57b4-4ad0-8911-fb8d70d109e7",
+      "name": "events - Display receipt",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        4920,
+        1900
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $json.html }}"
+      }
+    },
+    {
+      "id": "19be6265-fdd0-460f-811d-9fd10ffdb172",
+      "name": "worklist - Read investigations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3600,
+        2200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({action:\"worklist\",payload:{status:$(\"System configuration\").first().json.status||\"\"}}) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "d3292bb8-ad1b-4678-a6e2-34e4a34aca51",
+      "name": "worklist - Render investigations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3820,
+        2200
+      ],
+      "parameters": {
+        "jsCode": "const d=$input.first().json;\nconst esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nlet html='<main style=\"max-width:1100px;margin:24px auto;font-family:system-ui;line-height:1.7\"><h1>Investigation worklist</h1><p>Latest 50 matching investigations. Synthetic cases are labeled DEMO. Copy an investigation ID and choose report to inspect evidence.</p><div style=\"overflow:auto\"><table style=\"width:100%;text-align:left\"><tr><th>ID / IP</th><th>Status / Owner</th><th>Asset / Events</th><th>Priority</th></tr>';\nfor(const c of d.cases||[]){const x=c.context||{};html+='<tr><td style=\"padding:12px\"><code>'+esc(c.id)+'</code><br>'+esc(c.ip)+(x.demo?' \u00b7 DEMO':'')+'</td><td>'+esc(c.status)+'<br>'+esc(c.owner_name||'Unassigned')+'</td><td>'+esc(x.asset_id||'IP-only')+'<br>'+esc(x.total||0)+'</td><td>'+esc(x.priority||'unassessed')+'</td></tr>';}\nhtml+='</table></div><p><a href=\"/form/ip-intelligence\">Return to workspace</a></p></main>';\nreturn [{json:{...d,html}}];\n"
+      }
+    },
+    {
+      "id": "0fbf471d-2377-42de-a715-ae6d0506a111",
+      "name": "worklist - Display investigations",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        4040,
+        2200
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $json.html }}"
       }
     }
   ],
@@ -1650,6 +1895,20 @@
         ],
         [
           {
+            "node": "events - Preview import",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "worklist - Read investigations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Reject unsupported command",
             "type": "main",
             "index": 0
@@ -1678,15 +1937,105 @@
           }
         ]
       ]
+    },
+    "events - Preview import": {
+      "main": [
+        [
+          {
+            "node": "events - Render preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "events - Render preview": {
+      "main": [
+        [
+          {
+            "node": "events - Confirm import",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "events - Confirm import": {
+      "main": [
+        [
+          {
+            "node": "events - Prepare confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "events - Prepare confirmation": {
+      "main": [
+        [
+          {
+            "node": "events - Commit confirmed import",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "events - Commit confirmed import": {
+      "main": [
+        [
+          {
+            "node": "events - Render receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "events - Render receipt": {
+      "main": [
+        [
+          {
+            "node": "events - Display receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worklist - Read investigations": {
+      "main": [
+        [
+          {
+            "node": "worklist - Render investigations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worklist - Render investigations": {
+      "main": [
+        [
+          {
+            "node": "worklist - Display investigations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
+    "availableInMCP": true,
     "timezone": "UTC",
+    "saveManualExecutions": true,
     "executionTimeout": 180,
+    "binaryMode": "separate",
     "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all",
-    "saveManualExecutions": true
+    "saveDataSuccessExecution": "all"
   },
   "nodeGroups": [
     {
@@ -1831,6 +2180,30 @@
         "Reject unsupported command"
       ],
       "description": "Combined system: reject invalid task."
+    },
+    {
+      "id": "546396d4-e1cc-401d-8509-6366bb98817d",
+      "name": "Event intake and confirmation",
+      "description": "Validate event files, preview every row, explicitly confirm and persist a bounded batch.",
+      "nodeNames": [
+        "events - Preview import",
+        "events - Render preview",
+        "events - Confirm import",
+        "events - Prepare confirmation",
+        "events - Commit confirmed import",
+        "events - Render receipt",
+        "events - Display receipt"
+      ]
+    },
+    {
+      "id": "ebd77917-4146-49af-9e14-976d8941d1a8",
+      "name": "Investigation worklist",
+      "description": "Retrieve recent investigations and display activity priority, ownership and status.",
+      "nodeNames": [
+        "worklist - Read investigations",
+        "worklist - Render investigations",
+        "worklist - Display investigations"
+      ]
     }
   ],
   "active": false

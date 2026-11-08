@@ -1,5 +1,8 @@
 # Data model and RPC contract
 
+> The deployed baseline is described below. The event-investigation release candidate adds two private tables, event intake/confirmation and worklist branches; see [event release](EVENT_RELEASE.md) for its behavior and pending deployment gates.
+
+
 ## Tables
 
 | Table | Purpose | Important invariants |

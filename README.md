@@ -4,9 +4,11 @@
 
 An IP investigation system built as **one n8n workflow**, with hosted Supabase persistence and three intelligence providers. It turns a submitted IP into attributable evidence, a versioned automated assessment, and a separate analyst decision.
 
-**48 nodes · 3 providers · Rules v2.0 · One workflow**
+**58-node release candidate · 3 providers · Reputation rules v2.0 · One unified workflow**
 
-[Animated documentation](docs/site/index.html) · [Architecture](docs/ARCHITECTURE.md) · [Setup](docs/SETUP.md) · [Operations](docs/OPERATIONS.md) · [Security](docs/SECURITY.md) · [Verification](docs/VERIFICATION.md)
+The event-investigation release candidate adds validated JSON import, duplicate suppression, event correlation, contextual priority and an investigation worklist. The deployed instance remains on the previous 48-node release pending deployment approval. See [event release status](docs/EVENT_RELEASE.md).
+
+[Event investigation guide](docs/EVENT_RELEASE.md) · [Animated documentation](docs/site/index.html) · [Architecture](docs/ARCHITECTURE.md) · [Setup](docs/SETUP.md) · [Operations](docs/OPERATIONS.md) · [Security](docs/SECURITY.md) · [Verification](docs/VERIFICATION.md)
 
 > Live integrations and targeted acceptance tests have passed. Production throughput, independent security assurance, and disaster recovery remain validation milestones. See the verification guide for the scope of recorded evidence.
 

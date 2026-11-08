@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "events": [
+    {
+      "source": "fixture",
+      "event_id": "duplicate-001",
+      "occurred_at": "2026-01-01T12:00:00Z",
+      "event_type": "ssh_authentication",
+      "source_ip": "203.0.113.30",
+      "asset_id": "lab-server-03",
+      "account": "test-user",
+      "outcome": "failure"
+    },
+    {
+      "source": "fixture",
+      "event_id": "duplicate-001",
+      "occurred_at": "2026-01-01T12:00:00Z",
+      "event_type": "ssh_authentication",
+      "source_ip": "203.0.113.30",
+      "asset_id": "lab-server-03",
+      "account": "test-user",
+      "outcome": "failure"
+    }
+  ]
+}

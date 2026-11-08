@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "events": [
+    {
+      "source": "fixture",
+      "event_id": "",
+      "occurred_at": "not-a-date",
+      "event_type": "ssh_authentication",
+      "source_ip": "not-an-ip",
+      "asset_id": "lab-server-04",
+      "outcome": "unknown"
+    }
+  ]
+}

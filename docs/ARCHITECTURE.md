@@ -1,5 +1,8 @@
 # Architecture
 
+> The deployed baseline is described below. The event-investigation release candidate adds two private tables, event intake/confirmation and worklist branches; see [event release](EVENT_RELEASE.md) for its behavior and pending deployment gates.
+
+
 ## System boundary
 
 The runtime is one n8n workflow plus a hosted Supabase database. n8n owns form presentation, routing, HTTP calls, normalization, and HTML output. Supabase owns durable jobs, quotas, cache, cases, audit records, assessment snapshots, and analyst reviews.

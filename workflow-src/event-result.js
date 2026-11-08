@@ -1,0 +1,10 @@
+const d=$input.first().json;
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rows=(d.rows||[]).map(r=>'<tr><td>'+esc(r.index+1)+'</td><td>'+esc(r.status)+'</td><td>'+esc((r.errors||[]).join('; '))+'</td></tr>').join('');
+let html='<main style="max-width:920px;margin:24px auto;font-family:system-ui;line-height:1.7"><h1>'+(d.preview_only?'Import preview':'Import result')+'</h1><p>'+(d.demo?'Synthetic demo: live provider calls disabled.':'Live enrichment: provider jobs use configured budgets and cache.')+'</p>';
+if(d.inserted!==undefined)html+='<p>Events recorded: '+esc(d.inserted)+' · Duplicate deliveries: '+esc(d.duplicates)+'</p>';
+if(d.can_import===false)html+='<p>Import rejected. Correct every rejected row; no events from this batch were saved.</p>';
+html+='<table style="width:100%;text-align:left"><thead><tr><th>Row</th><th>Status</th><th>Validation errors</th></tr></thead><tbody>'+rows+'</tbody></table>';
+html+=(d.case_ids||[]).length?'<h2>Investigations</h2><ul>'+d.case_ids.map(id=>'<li><code>'+esc(id)+'</code></li>').join('')+'</ul><p>Choose report in the workspace to view an investigation, then case to record a review.</p>':'';
+html+='<p><a href="/form/ip-intelligence">Return to workspace</a></p></main>';
+return [{json:{...d,html}}];

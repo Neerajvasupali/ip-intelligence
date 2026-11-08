@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "fixture_only": true,
+  "warning": "Documentation-only addresses; never send these events to live providers.",
+  "scenarios": [
+    {
+      "name": "repeated_failures",
+      "expected": "three distinct related failures",
+      "events": [
+        {"source":"fixture","event_id":"fail-001","occurred_at":"2026-01-01T10:00:00Z","event_type":"ssh_authentication","source_ip":"192.0.2.10","asset_id":"lab-server-01","account":"test-user","outcome":"failure"},
+        {"source":"fixture","event_id":"fail-002","occurred_at":"2026-01-01T10:01:00Z","event_type":"ssh_authentication","source_ip":"192.0.2.10","asset_id":"lab-server-01","account":"test-user","outcome":"failure"},
+        {"source":"fixture","event_id":"fail-003","occurred_at":"2026-01-01T10:02:00Z","event_type":"ssh_authentication","source_ip":"192.0.2.10","asset_id":"lab-server-01","account":"test-user","outcome":"failure"}
+      ]
+    },
+    {
+      "name": "legitimate_mistake",
+      "expected": "failure and later success require analyst review",
+      "events": [
+        {"source":"fixture","event_id":"admin-001","occurred_at":"2026-01-01T11:00:00Z","event_type":"ssh_authentication","source_ip":"198.51.100.20","asset_id":"lab-server-02","account":"admin-test","outcome":"failure"},
+        {"source":"fixture","event_id":"admin-002","occurred_at":"2026-01-01T11:02:00Z","event_type":"ssh_authentication","source_ip":"198.51.100.20","asset_id":"lab-server-02","account":"admin-test","outcome":"success"}
+      ]
+    },
+    {
+      "name": "duplicate_delivery",
+      "expected": "one event and no duplicated enrichment",
+      "events": [
+        {"source":"fixture","event_id":"duplicate-001","occurred_at":"2026-01-01T12:00:00Z","event_type":"ssh_authentication","source_ip":"203.0.113.30","asset_id":"lab-server-03","account":"test-user","outcome":"failure"},
+        {"source":"fixture","event_id":"duplicate-001","occurred_at":"2026-01-01T12:00:00Z","event_type":"ssh_authentication","source_ip":"203.0.113.30","asset_id":"lab-server-03","account":"test-user","outcome":"failure"}
+      ]
+    },
+    {
+      "name": "invalid_event",
+      "expected": "reject without event or provider job",
+      "events": [
+        {"source":"fixture","event_id":"","occurred_at":"not-a-date","event_type":"ssh_authentication","source_ip":"not-an-ip","asset_id":"lab-server-04","outcome":"unknown"}
+      ]
+    }
+  ]
+}

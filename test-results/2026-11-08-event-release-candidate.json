@@ -1,0 +1,23 @@
+{
+  "verified_at": "2026-11-08T06:19:30.412396+00:00",
+  "status": "release_candidate",
+  "production_changed": false,
+  "checks": {
+    "fresh_migration_replay": "passed; six migrations in disposable PostgreSQL 17",
+    "sql_regressions": "passed; analyst layer, database acceptance, event investigations",
+    "python_preview_tests": "7 passed",
+    "workflow_structure": "passed; 58 nodes, inactive sanitized export, event/worklist/fallback routes",
+    "workflow_code": "syntax and five dynamic-form branches passed; actor provenance, malformed input and escaping passed",
+    "demo": "passed; 3 synthetic events, 1 case, replay suppression, priority, snapshot and explained fixture-attributed closure; zero provider jobs",
+    "visual": "Firefox 1440x1200 generated report inspected",
+    "markdown_links": 26,
+    "common_secret_patterns": "no matches"
+  },
+  "pending": [
+    "Live migration approval",
+    "Authenticated actual form upload and confirmation journey",
+    "Production smoke checks",
+    "Human manual-versus-assisted timing study"
+  ],
+  "deployment_review": "Automatic approval review rejected replacement of live API without explicit production-deployment approval."
+}

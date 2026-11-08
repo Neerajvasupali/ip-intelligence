@@ -23,8 +23,12 @@ To validate an import, attach all four credentials, configure the backend URL, i
 
 ## Limits
 
-Passing recorded tests does not establish a throughput SLA, independent security assurance, every browser/session deployment, permanent external API availability or correctness of all third-party threat intelligence. Evidence dates, stale results and provider disagreements must remain visible to the analyst. Wazuh ingestion is future work.
+Passing recorded tests does not establish a throughput SLA, independent security assurance, every browser/session deployment, permanent external API availability or correctness of all third-party threat intelligence. Evidence dates, stale results and provider disagreements must remain visible to the analyst. External alerting integrations are outside the current release scope.
 
 ## Documentation checks
 
 The [documentation validation record](../test-results/2026-11-07-documentation-verification.json) records Firefox desktop and mobile interaction checks, local link and asset validation, export sanitization and repository secret-pattern checks. Browser previews were inspected at 1440×1000 and 390×844. These checks do not call production APIs.
+
+## Event-investigation release candidate
+
+The 8 November candidate passes fresh migration replay, all three transactional SQL suites, seven Python preview tests, workflow Code-node syntax and five dynamic-form expressions, actor-provenance/escaping checks, and the isolated synthetic investigation demo. The actual generated HTML report was inspected in Firefox. These checks do not establish production form upload, browser authentication or measured analyst time savings. See [task status](TASK_STATUS.md) and [release guide](EVENT_RELEASE.md).

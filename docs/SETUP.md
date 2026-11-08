@@ -11,13 +11,9 @@ The validated workflow uses Form Trigger 2.6, Form 2.5, HTTP Request 4.5, Code 2
 
 ## 1. Database schema
 
-For a **fresh project**, review and apply the files in `supabase/migrations` in filename order. The first file is a consolidated initial schema containing the syntax/alias fixes. Later files add the analyst layer and review gating. Use a deployment method that respects the target migration history.
+For a **fresh project**, apply migration files in filename order. The five baseline migrations now match the exact historical SQL and version identifiers recorded in the reference deployment. Fresh migration replay and regression tests pass in isolated PostgreSQL.
 
-### Existing deployment warning
-
-The reference deployment was provisioned with five migrations through Supabase MCP. Their recorded timestamps and boundaries differ from these local consolidated files. The remote ledger includes `initialize_ip_intelligence`, `fix_report_job_alias`, `fix_metrics_column_ambiguity`, `add_assessment_snapshots_and_analyst_reviews`, and `require_saved_assessment_for_review`.
-
-**Do not blindly run `supabase db push` against an existing project.** Reconcile local migration files with its recorded history first. Do not run the initializer over an existing deployment as an upgrade mechanism. Keep any reconciliation reviewed and preserve deployed data.
+The event-investigation migration is a pending release candidate. Existing deployments must apply only migrations not already recorded, after checking the deployed ledger and reviewing the migration. Do not replay the initializer against an existing database. A remotely generated migration timestamp must be reflected locally after deployment. See [release status](EVENT_RELEASE.md).
 
 ## 2. Workflow import
 
@@ -29,7 +25,7 @@ In **System configuration**, enter the project's HTTPS URL. Let the target n8n i
 
 | Credential | Request authentication | Attach to |
 | --- | --- | --- |
-| Supabase backend secret | `apikey` header | All eight Supabase RPC nodes |
+| Supabase backend secret | `apikey` header | All Supabase RPC nodes |
 | AbuseIPDB key | `Key` header | AbuseIPDB lookup |
 | VirusTotal account | Native `virusTotalApi`, supplying `x-apikey` | VirusTotal lookup |
 | IPinfo token | `Authorization: Bearer …` | IPinfo Lite lookup |
