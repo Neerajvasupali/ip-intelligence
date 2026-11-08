@@ -1,0 +1,44 @@
+{
+  "verified_at": "2026-11-08T06:43:12.614933+00:00",
+  "status": "deployed",
+  "workflow_id": "EMHsTMuHxKKWEyzB",
+  "published_version": "126e6620-0d82-43c7-83cc-325619732721",
+  "migration_version": "20261108063105",
+  "checks": {
+    "fresh_database": "All six migrations replayed; three SQL acceptance suites passed",
+    "deployed_database": "Rollback-only event acceptance passed; no test provider calls",
+    "actual_authenticated_browser": [
+      "JSON file upload",
+      "Three-row validation preview",
+      "Explicit confirmation inserts three events in one case",
+      "Event-rich report and medium activity priority",
+      "Explained closure attributed to the signed-in user",
+      "Report retains review and closed status",
+      "Worklist all filter displays the demo case",
+      "Repeated file preview identifies three duplicates",
+      "Replay confirmation inserts zero events and records three duplicates"
+    ],
+    "anonymous_access": "GET and multipart POST return 401",
+    "fixture_case": {
+      "events": 3,
+      "provider_jobs": 0,
+      "reviews": 1,
+      "status": "closed",
+      "authenticated_review_attributed": true
+    },
+    "local_code": "Seven Python tests, Code-node syntax, five dynamic-form expressions, graph topology and actor/escaping checks passed"
+  },
+  "test_fixes": [
+    "Separated adjacent object braces in n8n expressions after actual engine rejection",
+    "Made rollback queue tests independent of pre-existing cache",
+    "Added explicit all worklist filter",
+    "Corrected synthetic evidence provenance labels"
+  ],
+  "limitations": [
+    "Synthetic demo inputs do not establish threat-detection accuracy",
+    "Human manual-versus-assisted time study remains unmeasured",
+    "Shared authorized-user workspace; no per-case tenant isolation",
+    "No automatic blocking"
+  ],
+  "cleanup": "Single temporary MCP synthetic smoke case removed after exact provenance check; browser demo case retained and labeled"
+}

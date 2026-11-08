@@ -1,12 +1,12 @@
-# Event investigations — release candidate
+# Event investigations
 
 ## Release status
 
-The repository contains a tested event-investigation release candidate. The production deployment remains the 48-node IP investigation workflow until the backend migration and 58-node unified workflow are approved and deployed. Local database tests and rendered reports do not establish authenticated production browser behavior.
+The 58-node unified workflow and event backend are deployed. The actual production browser journey passed JSON upload, preview, confirmation, event-rich report, explained closure, review history and worklist checks. Synthetic demo inputs were used, with zero provider jobs.
 
 ## Event import
 
-The new `events` portal action accepts one JSON file or pasted JSON. Files are limited to 256 KiB and 100 events. The server previews every row and requires an explicit second-page confirmation. Invalid batches persist no events. The backend revalidates the batch on confirmation, including conflicts introduced since preview.
+The `events` portal action accepts one JSON file or pasted JSON. Files are limited to 256 KiB and 100 events. The server previews every row and requires an explicit second-page confirmation. Invalid batches persist no events. The backend revalidates the batch on confirmation, including conflicts introduced since preview.
 
 Use `demo/*.json` for synthetic demonstration in **Synthetic demo** mode. These contain reserved documentation addresses and are rejected for live enrichment. Demo imports write labeled cases and evidence-unavailable markers but cannot create provider jobs. Live mode permits supported public IPs and reuses the established queue, provider budgets and cache. Demo mode is a trusted operator choice, not an input-file assertion.
 
@@ -37,7 +37,7 @@ The existing n8n authenticated-user boundary remains in force. Editable actor fi
 
 ## Migration reconciliation
 
-The five baseline SQL files now reproduce the exact versions, names and SQL recorded in the deployed Supabase ledger. No production ledger was rewritten and no original migration was replayed against production. Fresh isolated PostgreSQL replay and the existing acceptance suites pass. `20261108000100_add_event_investigations.sql` is pending deployment; its final timestamp must match the recorded remote version when applied.
+The five baseline SQL files now reproduce the exact versions, names and SQL recorded in the deployed Supabase ledger. No production ledger was rewritten and no original migration was replayed against production. Fresh isolated PostgreSQL replay and the existing acceptance suites pass. The deployed event migration is `20261108063105_add_event_investigations.sql`; its version matches the Supabase ledger.
 
 ## Verification commands
 
@@ -51,9 +51,10 @@ python3 scripts/run_demo.py
 
 Docker tests use isolated disposable PostgreSQL containers with no published ports. Scripts currently use passwordless sudo and the existing `n8n-n8n-1` container's Node runtime. PostgreSQL image must be available; after pulling it, the demo creates no external API requests. Runtime prerequisites are explicit and are not yet a universal one-command installer.
 
-## Remaining release gates
+## Evaluation still to complete
 
-1. Approval for live backend migration and workflow publication.
-2. Authenticated browser verification of actual upload, preview, confirmation, report and explained closure, plus anonymous rejection.
-3. Controlled production smoke check with no unnecessary provider calls.
-4. Human manual-versus-assisted investigation study. No time-saving or accuracy claim is made before measurements exist.
+The human manual-versus-assisted timing study has not been run. A protocol and blank CSV are provided under `evaluation/`. No measured analyst time-saving or real-world detection-accuracy claim is made. Per-case tenant isolation, direct case navigation and automatic blocking are outside this release.
+
+## Production verification
+
+The migration passed the rollback-only event acceptance suite on the deployed database. The unified workflow is published with all RPC credentials attached. Browser testing used a normal sign-in in a fresh profile, not copied session material. The retained demo investigation contains three fixture events, one explained review and zero provider jobs. Replaying the file identifies duplicates rather than creating another case. The scheduled worker remains operational.

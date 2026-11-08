@@ -4,7 +4,7 @@
 
 Repeated failed SSH authentication attempts can require an analyst to combine event activity, asset context and IP reputation. This project will group related activity and present evidence for an analyst decision. The initial use case accepts manually supplied synthetic events; an external alerting integration is not required.
 
-The release candidate implements event validation, grouped ingestion and contextual priority. Isolated database and workflow-code checks pass. Production deployment and authenticated browser checks remain pending; see [release status](EVENT_RELEASE.md).
+The deployed release implements event validation, grouped ingestion and contextual priority. Isolated database and workflow-code checks pass. Authenticated production browser checks pass; see [release status](EVENT_RELEASE.md).
 
 ## Investigation questions
 

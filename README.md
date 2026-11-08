@@ -4,9 +4,9 @@
 
 An IP investigation system built as **one n8n workflow**, with hosted Supabase persistence and three intelligence providers. It turns a submitted IP into attributable evidence, a versioned automated assessment, and a separate analyst decision.
 
-**58-node release candidate · 3 providers · Reputation rules v2.0 · One unified workflow**
+**58 nodes · 3 providers · Reputation rules v2.0 · One unified workflow**
 
-The event-investigation release candidate adds validated JSON import, duplicate suppression, event correlation, contextual priority and an investigation worklist. The deployed instance remains on the previous 48-node release pending deployment approval. See [event release status](docs/EVENT_RELEASE.md).
+The deployed event-investigation release adds validated JSON import, duplicate suppression, event correlation, contextual priority and an investigation worklist. The authenticated upload, confirmation, report and explained-review flow has been verified in a real browser. See [event release guide](docs/EVENT_RELEASE.md).
 
 [Event investigation guide](docs/EVENT_RELEASE.md) · [Animated documentation](docs/site/index.html) · [Architecture](docs/ARCHITECTURE.md) · [Setup](docs/SETUP.md) · [Operations](docs/OPERATIONS.md) · [Security](docs/SECURITY.md) · [Verification](docs/VERIFICATION.md)
 
@@ -22,7 +22,7 @@ This system brings those steps together. It does not treat a vendor flag as proo
 
 ## What it does
 
-- **Guided portal:** choose submission, report retrieval, or case review; see only the fields relevant to that task.
+- **Guided portal:** import security events, browse investigations, submit IPs, retrieve reports or record analyst reviews. Imports require a validation preview and explicit confirmation.
 - **Controlled enrichment:** provider-specific jobs, a durable queue, deduplication, cached evidence, daily budgets, and retry cooldowns.
 - **Three complementary sources:** AbuseIPDB for abuse reports, VirusTotal for vendor findings, IPinfo Lite for network context.
 - **Explainable assessments:** isolated, conflicting, cross-source, incomplete, and outdated evidence have distinct outcomes.
@@ -114,7 +114,7 @@ Available dispositions: **Under review**, **Confirmed malicious activity**, **Co
 
 Live tests exercised all three provider APIs, queue processing, duplicate requests, cached results, report retrieval, case closure, and scheduled execution. Failure responses were simulated inside n8n; lease recovery, quotas, snapshots, and review invariants were tested in rollback transactions. See [the test matrix](docs/VERIFICATION.md) for the exact boundaries.
 
-The newest reviewer workflow tests used a simulated authenticated n8n user and pinned external services. They prove workflow identity handling, not completion of a fresh interactive browser login. Earlier signed-in portal use was observed. Anonymous access was rejected.
+Earlier workflow tests used simulated identities. The event release additionally passed an actual authenticated browser journey: JSON file upload, preview, confirmation, report, explained closure, review history and worklist. Anonymous GET and multipart POST were rejected. Synthetic demo cases remain clearly labeled; no human time-saving result is claimed.
 
 ## Development discipline
 

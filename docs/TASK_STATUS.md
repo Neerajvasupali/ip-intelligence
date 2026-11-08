@@ -1,6 +1,6 @@
 # Event-investigation task status
 
-Release-candidate status, 8 November 2026. Implemented means present in the repository; it does not imply production deployment. No external alerting integration is included.
+Release status, 8 November 2026. The event backend and 58-node unified workflow are deployed. No external alerting integration is included.
 
 | # | Task | Status and evidence |
 | --- | --- | --- |
@@ -9,19 +9,21 @@ Release-candidate status, 8 November 2026. Implemented means present in the repo
 | 3 | Success measurements | Protocol complete; human results pending. See `evaluation/README.md` |
 | 4 | Migration reconciliation | Complete for baseline: exact five recorded deployed migrations restored locally; fresh replay passes; no production ledger mutation |
 | 5 | Event data model | Implemented and SQL-tested: events, event groups, original references and actor provenance |
-| 6 | Bounded JSON import and preview | Implemented in candidate: file or JSON, preview, explicit confirmation, atomic revalidation; actual authenticated form upload pending deployment |
+| 6 | Bounded JSON import and preview | Implemented in candidate: file or JSON, preview, explicit confirmation, atomic revalidation; actual authenticated file upload and confirmation passed |
 | 7 | Exact deduplication | SQL-tested: identical replay ignored; conflicting IDs rejected; retention bounds deduplication history |
 | 8 | Correlation | SQL-tested: source/IP/asset/15-minute bucket; distinct bucket creates case; closed case remains closed |
 | 9 | Enrichment queue reuse | SQL-tested: live-mode events share three provider jobs; replay creates no additional jobs; demo creates none |
 | 10 | Explainable contextual priority | SQL-tested; activity and declared asset context included in assessment conclusion/fingerprint; separate reputation assessment |
-| 11 | Investigation detail view | Implemented; actual renderer exercised with database output and inspected in Firefox; new worklist implemented; production integration pending |
-| 12 | Authenticated browser journey | Pending deployment approval and actual end-to-end browser verification. Code tests cover missing user and discarded forged actor fields |
-| 13 | Failure and recovery tests | Existing rollback suite passes on fresh schema, including leases/budgets/attempts; event malformed/conflicting-batch tests pass. Production smoke check pending |
+| 11 | Investigation detail view | Implemented; actual renderer exercised with database output and inspected in Firefox; new worklist implemented; production browser report and worklist verified |
+| 12 | Authenticated browser journey | Passed actual authenticated upload → preview → confirmation → report → explained closure → review history → worklist. Code tests also cover missing user and discarded forged actor fields |
+| 13 | Failure and recovery tests | Existing rollback suite passes on fresh schema, including leases/budgets/attempts; event malformed/conflicting-batch tests pass. Production backend acceptance and browser smoke checks passed |
 | 14 | Manual/assisted comparison | Protocol and CSV ready; requires real participant measurements. No time-saving claim made |
 | 15 | Self-contained demo | Passes: disposable database → fixtures → grouped investigation → replay suppression → assessment → fixture-attributed closure → HTML report; zero provider requests |
 
-## Release gates
+## Remaining evaluation
 
-Automatic approval review rejected the live migration because it replaces the running Supabase API. Explicit approval is required for that deployment. The tested workflow export remains inactive; the existing live workflow was not changed. After approval, apply the migration, reconcile its generated remote version locally, update the existing unified workflow, verify all draft routes, publish and exercise the real authenticated browser journey.
+The human manual-versus-assisted study remains unmeasured. The protocol and CSV are ready; no time-saving claims are inferred from automated tests. The current workspace is shared among authorized n8n users; multi-tenant isolation is not claimed.
 
-The demo supplies a synthetic reviewer directly to the trusted backend. It is not evidence of browser authentication. The current workspace is shared among authorized n8n users; multi-tenant isolation is not claimed.
+## Deployment evidence
+
+Migration version `20261108063105` matches the Supabase ledger. Production browser verification used a real signed-in n8n user and synthetic demo events. The demo case is closed with an explained insufficient-evidence decision and remains clearly labeled. See `test-results/2026-11-08-production-event-release.json` for the verification summary.

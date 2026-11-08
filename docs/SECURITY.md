@@ -1,6 +1,6 @@
 # Security model
 
-> The deployed baseline is described below. The event-investigation release candidate adds two private tables, event intake/confirmation and worklist branches; see [event release](EVENT_RELEASE.md) for its behavior and pending deployment gates.
+> The original IP-enrichment architecture is described below. The deployed event release adds two private tables, event intake/confirmation and worklist branches; see [event release](EVENT_RELEASE.md) for the current behavior.
 
 
 ## Trust boundaries

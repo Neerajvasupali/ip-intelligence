@@ -36,6 +36,9 @@ begin
  r:=public.ipintel_api('events_ingest',jsonb_set(p,'{events}',jsonb_build_array(e||'{"event_id":"after-close"}')));
  if r->'case_ids'=jsonb_build_array(cid) then raise exception 'Closed case silently reopened';end if;
  if (select count(*) from ipintel.jobs)<>j then raise exception 'Demo scheduled provider work';end if;
+ delete from ipintel.cache where ip='1.1.1.1'::inet;
+ delete from ipintel.jobs where ip='1.1.1.1'::inet and id not in (select job_id from ipintel.case_sources where job_id is not null);
+ select count(*) into j from ipintel.jobs;
  update ipintel.providers set enabled=true;
  p:=jsonb_set(p,'{events}',jsonb_build_array(e||'{"source":"live-acceptance","event_id":"live-one","source_ip":"1.1.1.1"}',e||'{"source":"live-acceptance","event_id":"live-two","source_ip":"1.1.1.1"}'))||'{"demo":false}';
  r:=public.ipintel_api('events_ingest',p);

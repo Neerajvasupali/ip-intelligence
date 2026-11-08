@@ -13,7 +13,7 @@ The validated workflow uses Form Trigger 2.6, Form 2.5, HTTP Request 4.5, Code 2
 
 For a **fresh project**, apply migration files in filename order. The five baseline migrations now match the exact historical SQL and version identifiers recorded in the reference deployment. Fresh migration replay and regression tests pass in isolated PostgreSQL.
 
-The event-investigation migration is a pending release candidate. Existing deployments must apply only migrations not already recorded, after checking the deployed ledger and reviewing the migration. Do not replay the initializer against an existing database. A remotely generated migration timestamp must be reflected locally after deployment. See [release status](EVENT_RELEASE.md).
+The event-investigation migration is deployed and versioned locally. Existing deployments must apply only migrations not already recorded, after checking the deployed ledger and reviewing the migration. Do not replay the initializer against an existing database. A remotely generated migration timestamp must be reflected locally after deployment. See [release status](EVENT_RELEASE.md).
 
 ## 2. Workflow import
 
