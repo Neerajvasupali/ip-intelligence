@@ -32,3 +32,7 @@ The [documentation validation record](../test-results/2026-11-07-documentation-v
 ## Event-investigation release candidate
 
 The 8 November candidate passes fresh migration replay, all three transactional SQL suites, seven Python preview tests, workflow Code-node syntax and five dynamic-form expressions, actor-provenance/escaping checks, and the isolated synthetic investigation demo. The actual generated HTML report was inspected in Firefox. Subsequent deployed verification passed actual form upload, browser authentication, preview, confirmation, report, explained closure and worklist checks. Human time savings remain unmeasured. See [task status](TASK_STATUS.md) and [release guide](EVENT_RELEASE.md).
+
+## Investigation correctness
+
+Seven migrations and four SQL suites pass on a fresh isolated database. The same four suites pass as rollback-only checks on the deployed Supabase project. Review-binding tests reject stale, missing and wrong snapshots without changing the case, and valid reviews preserve the supplied assessment. Sequence tests cover event order, unrelated accounts, missing attribution and critical assets. Human timing and multi-session concurrency benchmarking remain outside these results.

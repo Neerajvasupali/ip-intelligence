@@ -31,7 +31,7 @@ The shared configuration stores the Supabase URL. Credentials are attached to in
 6. Query the selected provider with a bounded request timeout; normalize the result.
 7. Commit using the job ID and lease token. Stale or expired workers cannot commit.
 8. On report retrieval, evaluate current case evidence and save an assessment snapshot if its evidence/conclusion fingerprint is new.
-9. An authenticated reviewer records a disposition, explanation, and case status, referencing the latest saved assessment.
+9. An authenticated reviewer records a disposition, explanation, and case status, referencing the exact displayed assessment, verified against current evidence before the review is saved.
 
 ## Queue and failure controls
 

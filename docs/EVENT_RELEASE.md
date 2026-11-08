@@ -20,14 +20,16 @@ Asset criticality is declared by the authenticated operator when a group is crea
 
 Daily admission is bounded to 1,000 events, alongside the existing 200-case rolling-day ceiling. Imports are serialized transactionally. A limit error rolls back the batch. Duplicate rows count toward the conservative event admission check but create no additional records or requests.
 
-## Priority rules 1.0
+## Priority rules 1.1
 
-- Three or more failures and a success in the same group: high; investigate sequence and relationship.
+- At least three failures strictly before a success for the same supplied account: high; investigate whether access was authorized. Earlier successes, unrelated accounts and missing accounts do not establish this sequence.
 - Three or more failures against a declared critical asset: high.
 - Three or more failures: medium.
 - Otherwise: unassessed.
 
 Priority is activity context, not incident severity or proof of compromise. The existing reputation rules and evidence quality remain separate. Event context and priority are included in saved assessment conclusions and their fingerprints; changed activity produces another snapshot.
+
+Reviews now require the assessment ID displayed in the report. A stale or mismatched assessment is rejected without changing case state. Refresh the report after evidence changes. See [correctness details](INVESTIGATION_CORRECTNESS.md).
 
 ## Workspace and access
 

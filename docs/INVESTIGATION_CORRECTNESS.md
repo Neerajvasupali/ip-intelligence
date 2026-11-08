@@ -1,6 +1,6 @@
 # Investigation correctness update
 
-Status: locally tested, not deployed. The production release remains unchanged. This branch updates the backend and review form as a coordinated release.
+Status: backend and coordinated review form deployed. The migration is recorded as `20261108144909`. All four rollback-only SQL suites pass on the deployed database. Browser verification is recorded in the release evidence.
 
 ## Assessment-bound review
 
@@ -14,17 +14,17 @@ The form currently requires the assessment ID explicitly. The backend does not t
 
 High sequence-based priority requires at least three failures strictly earlier than a success for the same nonblank supplied account in the correlated group. Equal timestamps do not establish ordering. Account comparisons are case-sensitive after trimming; no account identity is inferred when data is missing.
 
-A success before failures or for a different account does not establish the same-account sequence. Three total failures still produce medium priority, or high priority when the asset was declared critical. Reports include the sequence flag, count of targeted accounts and count of events without account information. These remain investigation leads, not compromise findings.
+A success before failures or for a different account does not establish the same-account sequence. Three total failures still produce medium priority, or high priority when the asset was declared critical. Reports display the sequence flag, count of targeted accounts and count of events without account information. These remain investigation leads, not compromise findings.
 
 Existing saved assessments retain their previous conclusions. New report fingerprints include priority-rule version and updated context, so changed conclusions produce separate snapshots.
 
 ## Validation
 
-Run `python3 scripts/test_database.py`, `python3 scripts/check_workflow.py`, `python3 scripts/test_workflow_code.py` and `python3 scripts/run_demo.py`. Seven migrations and all four transactional suites pass in isolated PostgreSQL. The regression suite covers unchanged review rejection, exact snapshot attribution, event order, different accounts, missing accounts and critical assets. No production or browser validation is claimed for this branch.
+Run `python3 scripts/test_database.py`, `python3 scripts/check_workflow.py`, `python3 scripts/test_workflow_code.py` and `python3 scripts/run_demo.py`. Seven migrations and all four transactional suites pass in isolated PostgreSQL. The regression suite covers unchanged review rejection, exact snapshot attribution, event order, different accounts, missing accounts and critical assets. The deployed backend also passes all four rollback-only suites. See the production correctness evidence for the precise browser checks and their scope.
 
 ## Coordinated deployment
 
-1. Restore access to the target Supabase project and inspect its migration ledger.
+1. Inspect the target migration ledger before applying an upgrade.
 2. Temporarily pause review submissions during the backend/form transition.
 3. Apply only the new migration; retain its recorded remote version locally.
 4. Update the existing unified workflow with the assessment field, validation and RPC mapping. Preserve all credentials and authentication settings.
@@ -32,3 +32,7 @@ Run `python3 scripts/test_database.py`, `python3 scripts/check_workflow.py`, `py
 6. Re-enable review submissions and update release evidence before merging to the production branch.
 
 The new required review field intentionally changes the backend contract. Applying only the migration would reject old-form reviews. Historical migrations must not be replayed over the live database.
+
+## Production browser result
+
+A signed-in user viewed a three-failure investigation, then imported a subsequent success for the same account. A review using the original assessment was rejected; the case stayed open with no review saved. The refreshed report showed high contextual priority and the established supplied sequence. A review using that report assessment succeeded. Database inspection confirmed four synthetic events, one attributed review linked to the exact refreshed assessment, and zero provider jobs. The form renders rejection as an actionable refresh message rather than a generic execution error.

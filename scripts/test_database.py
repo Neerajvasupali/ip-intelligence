@@ -9,8 +9,8 @@ def sql(value):return run(['sudo','-n','docker','exec','-i',name,'psql','-U','po
 try:
  run(['sudo','-n','docker','run','-d','--name',name,'--network','none','-e','POSTGRES_HOST_AUTH_METHOD=trust','postgres:17-alpine'],capture_output=True)
  import time
- for _ in range(40):
-  if subprocess.run(['sudo','-n','docker','exec',name,'pg_isready','-U','postgres'],capture_output=True).returncode==0:break
+ for _ in range(120):
+  if subprocess.run(['sudo','-n','docker','exec',name,'pg_isready','-h','127.0.0.1','-U','postgres'],capture_output=True).returncode==0:break
   time.sleep(.25)
  sql('create role anon;create role authenticated;create role service_role;')
  for path in sorted((ROOT/'supabase/migrations').glob('*.sql')):

@@ -1,0 +1,37 @@
+{
+  "verified_at": "2026-11-08T14:59:15.235881+00:00",
+  "status": "deployed_verified",
+  "migration": "20261108144909",
+  "workflow_id": "EMHsTMuHxKKWEyzB",
+  "published_version": "8be4e1b5-520e-4f93-899c-8d6de767bcf7",
+  "database_checks": "All four suites passed as rollback-only checks on deployed Supabase; all seven migrations and four suites passed in a fresh isolated database",
+  "browser_checks": [
+    "Stale review rejected with actionable refresh message",
+    "Fresh report establishes same-account subsequent success",
+    "Fresh assessment permits attributed explained closure"
+  ],
+  "state_checks": {
+    "stale_attempt_case_status": "open",
+    "stale_attempt_reviews": 0,
+    "final_case_status": "closed",
+    "final_events": 4,
+    "final_reviews": 1,
+    "exact_assessment_and_actor": true,
+    "provider_jobs": 0
+  },
+  "local_checks": [
+    "Seven Python preview tests passed",
+    "Workflow topology, Code syntax and five dynamic forms passed",
+    "Actor provenance and escaping tests passed",
+    "Isolated demo passed"
+  ],
+  "notes": [
+    "One intentionally rejected browser review initially produced an execution error; updated form now displays an actionable non-success receipt",
+    "The PostgreSQL test runner now waits for the final TCP listener, avoiding initialization-socket races"
+  ],
+  "limitations": [
+    "No multi-session concurrency benchmark",
+    "Human timing study remains unmeasured",
+    "Workspace remains shared among authorized n8n users"
+  ]
+}

@@ -9,7 +9,7 @@ Release status, 8 November 2026. The event backend and 58-node unified workflow 
 | 3 | Success measurements | Protocol complete; human results pending. See `evaluation/README.md` |
 | 4 | Migration reconciliation | Complete for baseline: exact five recorded deployed migrations restored locally; fresh replay passes; no production ledger mutation |
 | 5 | Event data model | Implemented and SQL-tested: events, event groups, original references and actor provenance |
-| 6 | Bounded JSON import and preview | Implemented in candidate: file or JSON, preview, explicit confirmation, atomic revalidation; actual authenticated file upload and confirmation passed |
+| 6 | Bounded JSON import and preview | Implemented and deployed: file or JSON, preview, explicit confirmation, atomic revalidation; actual authenticated file upload and confirmation passed |
 | 7 | Exact deduplication | SQL-tested: identical replay ignored; conflicting IDs rejected; retention bounds deduplication history |
 | 8 | Correlation | SQL-tested: source/IP/asset/15-minute bucket; distinct bucket creates case; closed case remains closed |
 | 9 | Enrichment queue reuse | SQL-tested: live-mode events share three provider jobs; replay creates no additional jobs; demo creates none |
@@ -27,3 +27,7 @@ The human manual-versus-assisted study remains unmeasured. The protocol and CSV 
 ## Deployment evidence
 
 Migration version `20261108063105` matches the Supabase ledger. Production browser verification used a real signed-in n8n user and synthetic demo events. The demo case is closed with an explained insufficient-evidence decision and remains clearly labeled. See `test-results/2026-11-08-production-event-release.json` for the verification summary.
+
+## Investigation correctness follow-up
+
+The deployed follow-up requires the displayed assessment ID and rejects stale decisions without changing the case. SSH priority rules 1.1 verify same-account event order. Actual production browser checks cover stale rejection, the refresh instruction, updated sequence evidence and a valid fresh-assessment closure. See [correctness release notes](INVESTIGATION_CORRECTNESS.md).

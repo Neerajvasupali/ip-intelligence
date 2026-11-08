@@ -2,7 +2,7 @@
 
 ### Evidence before action.
 
-> This feature branch contains the tested investigation-correctness update. It is not deployed. The production release is on `main`; see [correctness release notes](docs/INVESTIGATION_CORRECTNESS.md) for deployment requirements.
+> The investigation-correctness update binds reviews to the displayed current assessment and adds account- and sequence-aware SSH priority. See [correctness release notes](docs/INVESTIGATION_CORRECTNESS.md).
 
 An IP investigation system built as **one n8n workflow**, with hosted Supabase persistence and three intelligence providers. It turns a submitted IP into attributable evidence, a versioned automated assessment, and a separate analyst decision.
 
