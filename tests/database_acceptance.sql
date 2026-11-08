@@ -1,0 +1,40 @@
+
+begin;
+update ipintel.providers set enabled=false;
+update ipintel.providers set used=0,day=(now() at time zone 'UTC')::date,next_at=now() where name='ipinfo';
+do $test$
+declare a jsonb;b jsonb;job jsonb;r jsonb;cid uuid;
+begin
+ perform public.ipintel_api('configure','{"provider":"ipinfo","enabled":true}');
+ a:=public.ipintel_api('enqueue','{"ip":"4.2.2.2","request_key":"acceptance-first"}');cid:=(a->>'case_id')::uuid;
+ b:=public.ipintel_api('enqueue','{"ip":"4.2.2.2","request_key":"acceptance-first"}');
+ if b->>'case_id'<>a->>'case_id' or not (b->>'duplicate')::boolean then raise exception 'Idempotency failed';end if;
+ perform public.ipintel_api('enqueue','{"ip":"4.2.2.2","request_key":"acceptance-second"}');
+ if (select count(*) from ipintel.jobs where ip='4.2.2.2' and provider='ipinfo')<>1 then raise exception 'Coalescing failed';end if;
+ begin perform public.ipintel_api('enqueue','{"ip":"10.0.0.1","request_key":"private-test"}');raise exception 'Private IP accepted';exception when others then if sqlerrm='Private IP accepted' then raise;end if;end;
+ job:=public.ipintel_api('claim');if not (job->>'available')::boolean then raise exception 'Claim failed';end if;
+ r:=public.ipintel_api('claim');if (r->>'available')::boolean then raise exception 'Cooldown failed';end if;
+ r:=public.ipintel_api('finish',jsonb_build_object('job_id',job->>'job_id','token',gen_random_uuid(),'result',jsonb_build_object('status','ok')));
+ if (r->>'accepted')::boolean then raise exception 'Fencing failed';end if;
+ r:=public.ipintel_api('finish',job||jsonb_build_object('result',jsonb_build_object('status','ok','evidence',jsonb_build_object('asn','SYNTHETIC-AS'))));
+ if not (r->>'accepted')::boolean then raise exception 'Completion failed';end if;
+ r:=public.ipintel_api('report',jsonb_build_object('case_id',cid));if r#>>'{sources,ipinfo,status}'<>'ok' then raise exception 'Report failed';end if;
+ a:=public.ipintel_api('enqueue','{"ip":"4.2.2.2","request_key":"acceptance-cache"}');
+ r:=public.ipintel_api('report',jsonb_build_object('case_id',a->>'case_id'));
+ if not (r#>>'{sources,ipinfo,from_cache}')::boolean then raise exception 'Cache failed';end if;
+ perform public.ipintel_api('case_update',jsonb_build_object('case_id',cid,'status','closed','owner','Acceptance test','disposition','insufficient_evidence','actor',jsonb_build_object('id','synthetic-test-reviewer','name','Acceptance test','source','n8n_authenticated_user'),'note','Verified synthetic result'));
+ if (select status from ipintel.cases where id=cid)<>'closed' then raise exception 'Case update failed';end if;
+ perform public.ipintel_api('enqueue','{"ip":"4.2.2.1","request_key":"acceptance-rate"}');
+ update ipintel.providers set next_at=now()-interval '1 minute' where name='ipinfo';
+ job:=public.ipintel_api('claim');
+ perform public.ipintel_api('finish',job||jsonb_build_object('result',jsonb_build_object('status','rate_limited'),'retry_at',now()+interval '2 hours'));
+ if (select next_at from ipintel.providers where name='ipinfo')<now()+interval '2 hours' then raise exception 'Retry-After failed';end if;
+ if (select status from ipintel.jobs where id=(job->>'job_id')::uuid)<>'queued' then raise exception 'Retry failed';end if;
+ update ipintel.providers set used=100,next_at=now()-interval '1 minute' where name='ipinfo';
+ r:=public.ipintel_api('claim');if (r->>'available')::boolean then raise exception 'Budget failed';end if;
+ if has_function_privilege('anon','public.ipintel_api(text,jsonb)','execute') or has_function_privilege('authenticated','public.ipintel_api(text,jsonb)','execute') then raise exception 'Public RPC exposure';end if;
+ if not has_function_privilege('service_role','public.ipintel_api(text,jsonb)','execute') then raise exception 'Backend denied';end if;
+end;
+$test$;
+select 'passed' as acceptance_tests,13 as checks;
+rollback;

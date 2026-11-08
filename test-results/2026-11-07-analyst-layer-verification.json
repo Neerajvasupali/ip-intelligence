@@ -1,0 +1,49 @@
+{
+  "verified_at": "2026-11-07T15:11:57.746Z",
+  "workflow_id": "EMHsTMuHxKKWEyzB",
+  "active_version": "49759c04-a079-4688-a0c4-f7cc9071b9fe",
+  "workflow_tests": [
+    {
+      "test": "Attributed case review and forged-field rejection",
+      "execution": "88",
+      "result": "passed",
+      "scope": "Simulated authenticated trigger; all external services pinned"
+    },
+    {
+      "test": "Missing reviewer identity rejected",
+      "execution": "90",
+      "result": "passed"
+    },
+    {
+      "test": "Pending disposition cannot close case",
+      "execution": "91",
+      "result": "passed"
+    },
+    {
+      "test": "Missing explanation rejected",
+      "execution": "92",
+      "result": "passed"
+    },
+    {
+      "test": "Report assessment and history rendering",
+      "execution": "93",
+      "result": "passed",
+      "scope": "Real database report supplied to pinned RPC output"
+    }
+  ],
+  "database_tests": [
+    "Outdated evidence classification",
+    "Multiple-vendor signal classification",
+    "Elevated abuse signal classification",
+    "Cannot review a case without a saved assessment",
+    "Rejected review leaves no review record",
+    "Anonymous and authenticated Supabase client roles cannot invoke backend RPC",
+    "No leftover rollback fixtures"
+  ],
+  "previous_database_tests": "Analyst-layer transactional suite verified snapshots, deduplication, append-only reviews, explanation requirements and actor attribution during implementation.",
+  "limitations": [
+    "Interactive browser identity was represented by a fixture in workflow tests; no real user was impersonated and no synthetic analyst decisions were committed.",
+    "An authenticated reviewer identity is trusted from n8n at the backend boundary; the Supabase service key must stay server-side."
+  ],
+  "status": "passed"
+}

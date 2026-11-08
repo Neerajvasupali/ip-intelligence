@@ -1,0 +1,24 @@
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+connection.json
+*.key
+*.pem
+*.p12
+*.pfx
+# Runtime state
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+.supabase/
+supabase/.temp/
+supabase/.branches/
+*.log
+.DS_Store
+# Documentation preview artifacts
+.preview/

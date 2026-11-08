@@ -1,0 +1,192 @@
+{
+  "date": "2026-11-07",
+  "workflowId": "EMHsTMuHxKKWEyzB",
+  "active": true,
+  "activeVersionId": "4a772083-97a3-48bd-b335-9254846336fc",
+  "liveTestIP": "1.1.1.1",
+  "providerRequests": "One fresh lookup per provider; subsequent cases used cached evidence.",
+  "workflowChecks": [
+    {
+      "name": "Fresh public-IP submission",
+      "passed": true,
+      "details": {
+        "execution": "24",
+        "case_id": "ee182a2d-bd57-4dd5-87fd-b573abc3bfa6",
+        "status": "waiting"
+      }
+    },
+    {
+      "name": "Worker execution 1",
+      "passed": true,
+      "details": {
+        "id": "25",
+        "lookup": "ok"
+      }
+    },
+    {
+      "name": "Worker execution 2",
+      "passed": true,
+      "details": {
+        "id": "26",
+        "lookup": "ok"
+      }
+    },
+    {
+      "name": "Worker execution 3",
+      "passed": true,
+      "details": {
+        "id": "27",
+        "lookup": "ok"
+      }
+    },
+    {
+      "name": "Duplicate request reuses case",
+      "passed": true,
+      "details": {
+        "execution": "29"
+      }
+    },
+    {
+      "name": "All three providers returned evidence",
+      "passed": true,
+      "details": {
+        "execution": "31",
+        "assessment": "suspicious"
+      }
+    },
+    {
+      "name": "Cache reused for all providers",
+      "passed": true,
+      "details": {
+        "case_id": "2198fbab-82d0-4146-85db-2b107f277e1d"
+      }
+    },
+    {
+      "name": "Full reputation coverage",
+      "passed": true,
+      "details": {}
+    },
+    {
+      "name": "Case update",
+      "passed": true,
+      "details": {
+        "execution": "32"
+      }
+    },
+    {
+      "name": "Closed case and audit history",
+      "passed": true,
+      "details": {}
+    },
+    {
+      "name": "Report escapes user markup",
+      "passed": true,
+      "details": {}
+    },
+    {
+      "name": "Reject invalid or special-use input: 10.0.0.1",
+      "passed": true,
+      "details": {
+        "execution": "34",
+        "error": "Private, reserved, documentation or other special-use IPv4 address; no external lookup. [line 1]"
+      }
+    },
+    {
+      "name": "Reject invalid or special-use input: https://example.com",
+      "passed": true,
+      "details": {
+        "execution": "35",
+        "error": "Invalid IP address. Enter one IPv4 or IPv6 literal without a port, URL, CIDR or zone ID. [line 1]"
+      }
+    },
+    {
+      "name": "Reject invalid or special-use input: 2001:db8::1",
+      "passed": true,
+      "details": {
+        "execution": "36",
+        "error": "Special-use, non-global or conservatively excluded IPv6 address; no external lookup. [line 1]"
+      }
+    },
+    {
+      "name": "Provider failure: rate_limited",
+      "passed": true,
+      "details": {
+        "execution": "38"
+      }
+    },
+    {
+      "name": "Retry-After preserved",
+      "passed": true,
+      "details": {}
+    },
+    {
+      "name": "Provider failure: authentication_error",
+      "passed": true,
+      "details": {
+        "execution": "39"
+      }
+    },
+    {
+      "name": "Provider failure: unavailable",
+      "passed": true,
+      "details": {
+        "execution": "40"
+      }
+    },
+    {
+      "name": "Provider failure: not_found",
+      "passed": true,
+      "details": {
+        "execution": "41"
+      }
+    },
+    {
+      "name": "Provider failure: invalid_schema",
+      "passed": true,
+      "details": {
+        "execution": "42"
+      }
+    },
+    {
+      "name": "Console action: ops",
+      "passed": true,
+      "details": {
+        "execution": "45"
+      }
+    },
+    {
+      "name": "Console action: setup",
+      "passed": true,
+      "details": {
+        "execution": "46"
+      }
+    },
+    {
+      "name": "Console action: demo",
+      "passed": true,
+      "details": {
+        "execution": "47"
+      }
+    }
+  ],
+  "databaseChecks": [
+    "Expired lease rejected",
+    "Expired lease recovered with a new token",
+    "Stale worker completion rejected",
+    "Transient error returned to queue",
+    "Daily request cap enforced",
+    "UTC quota reset",
+    "Three-attempt retry ceiling",
+    "Anonymous role denied RPC execution",
+    "Retention removes only eligible old closed cases",
+    "Provider enable and disable controls"
+  ],
+  "accessChecks": [
+    "Anonymous portal GET: HTTP 401",
+    "Anonymous multipart portal POST: HTTP 401",
+    "Unsigned-in access to result pages: HTTP 401"
+  ],
+  "cleanup": "Two temporary cases and six suspended portal test executions removed. Valid provider cache retained. Expected invalid-input test failures retained in execution history.",
+  "remainingManualCheck": "Sign in to n8n in a browser and open /form/ip-intelligence. The automated tools cannot complete a real interactive browser sign-in.",
+  "scope": "Live provider and backend tests, simulated failure responses, transaction-rolled-back database reliability tests. No stress/load benchmark or exhaustive security audit."
+}

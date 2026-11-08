@@ -1,0 +1,116 @@
+{
+  "verified_at": "2026-11-07T15:44:11.135700+00:00",
+  "scope": "Local static documentation; no production workflow or external provider retest",
+  "browser": "Firefox headless",
+  "visual_review": {
+    "desktop": "1440x1000",
+    "mobile": "390x844"
+  },
+  "desktop_interactions": {
+    "viewport": 1424,
+    "checks": [
+      {
+        "name": "No viewport overflow",
+        "passed": true
+      },
+      {
+        "name": "Scenario switch",
+        "passed": true
+      },
+      {
+        "name": "Partial coverage",
+        "passed": true
+      },
+      {
+        "name": "Lifecycle tab",
+        "passed": true
+      },
+      {
+        "name": "Keyboard tab navigation",
+        "passed": true
+      },
+      {
+        "name": "Search empty result hides navigation",
+        "passed": true
+      },
+      {
+        "name": "Search reset",
+        "passed": true
+      },
+      {
+        "name": "Theme toggle",
+        "passed": true
+      },
+      {
+        "name": "Motion toggle",
+        "passed": true
+      },
+      {
+        "name": "Mobile menu state",
+        "passed": true
+      },
+      {
+        "name": "No third party resources",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  "mobile_interactions": {
+    "viewport": 374,
+    "checks": [
+      {
+        "name": "No viewport overflow",
+        "passed": true
+      },
+      {
+        "name": "Scenario switch",
+        "passed": true
+      },
+      {
+        "name": "Partial coverage",
+        "passed": true
+      },
+      {
+        "name": "Lifecycle tab",
+        "passed": true
+      },
+      {
+        "name": "Keyboard tab navigation",
+        "passed": true
+      },
+      {
+        "name": "Search empty result hides navigation",
+        "passed": true
+      },
+      {
+        "name": "Search reset",
+        "passed": true
+      },
+      {
+        "name": "Theme toggle",
+        "passed": true
+      },
+      {
+        "name": "Motion toggle",
+        "passed": true
+      },
+      {
+        "name": "Mobile menu state",
+        "passed": true
+      },
+      {
+        "name": "No third party resources",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  "static_checks": {
+    "markdown_and_html_local_links": "passed",
+    "served_assets": "passed",
+    "sanitized_export": "48 nodes, inactive, no credential bindings or webhook IDs, no pin data, backend URL blank",
+    "common_secret_patterns": "No suspected secrets found; heuristic scan, not a security guarantee",
+    "git_ignores": "Secrets, local runtime state and preview artifacts excluded"
+  }
+}

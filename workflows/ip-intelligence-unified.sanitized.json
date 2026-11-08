@@ -1,0 +1,1837 @@
+{
+  "name": "IP Intelligence - Unified Investigation System",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const x=$input.first().json;if(!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(x.supabase_url||''))throw new Error('Set supabase_url in Connection settings to your Supabase project URL before running.');return [{json:x}];"
+      },
+      "id": "6dfea4a4-b20a-4fdc-b5c8-c7c7df029722",
+      "name": "submit - Check connection settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = String($json.ip ?? '').trim();\nfunction v4(s) {\n const p=s.split('.');\n if(p.length!==4 || p.some(x=>! /^(0|[1-9][0-9]{0,2})$/.test(x)||Number(x)>255)) return null;\n return p.map(Number);\n}\nfunction v6(s) {\n if(!s.includes(':')||s.includes('%')||s.includes('.')||!/^[0-9a-f:]+$/i.test(s)) return null;\n const halves=s.toLowerCase().split('::');\n if(halves.length>2) return null;\n const a=halves[0]?halves[0].split(':'):[];\n const b=halves.length===2&&halves[1]?halves[1].split(':'):[];\n if([...a,...b].some(x=>! /^[0-9a-f]{1,4}$/.test(x)))return null;\n if(halves.length===1&&a.length!==8 || halves.length===2&&a.length+b.length>=8)return null;\n return halves.length===1?a.map(x=>parseInt(x,16)):[...a.map(x=>parseInt(x,16)),...Array(8-a.length-b.length).fill(0),...b.map(x=>parseInt(x,16))];\n}\nconst a=v4(raw), b=a?null:v6(raw);\nlet eligible=false, reason='Invalid IP address. Enter one IPv4 or IPv6 literal without a port, URL, CIDR or zone ID.', ip=raw, family=null;\nif(a){\n family=4;ip=a.join('.');\n const [x,y,z]=a;\n const excluded=x===0||x===10||x===127||x>=224||(x===100&&y>=64&&y<=127)||(x===169&&y===254)||(x===172&&y>=16&&y<=31)||(x===192&&(y===168||y===0||y===2||y===88&&z===99))||(x===198&&(y===18||y===19||y===51&&z===100))||(x===203&&y===0&&z===113);\n eligible=!excluded;reason=eligible?'Public IPv4 address':'Private, reserved, documentation or other special-use IPv4 address; no external lookup.';\n}else if(b){\n family=6;ip=b.map(x=>x.toString(16).padStart(4,'0')).join(':');\n eligible=b[0]>=0x2000&&b[0]<=0x3fff&&!(b[0]===0x2001&&(b[1]<0x0200||b[1]===0x0db8))&&b[0]!==0x2002&&!(b[0]>=0x3fff&&b[1]<0x1000);\n reason=eligible?'Global-unicast IPv6 address':'Special-use, non-global or conservatively excluded IPv6 address; no external lookup.';\n}\nreturn [{json:{ip,input:raw,family,eligible,validation_reason:reason,source:'form',requested_at:new Date().toISOString(),enabled:{abuseipdb:$json.enable_abuseipdb===true,virustotal:$json.enable_virustotal===true,ipinfo:$json.enable_ipinfo===true}}}];"
+      },
+      "id": "65934096-9d08-4bab-8ae5-1350268a1c85",
+      "name": "submit - Validate public IP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const x=$input.first().json;if(!x.eligible)throw new Error(x.validation_reason);const f=$('System configuration').first().json;return [{json:{payload:{ip:x.ip,reason:String(f.reason||'').slice(0,2000),request_key:String(f.request_key||('n8n-'+$execution.id)).slice(0,150)}}}];"
+      },
+      "id": "7cecdae6-a065-48a6-8657-e292e42fbefa",
+      "name": "submit - Prepare submission",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"enqueue\", payload: $json.payload }) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "f7a0d546-6ca6-4e63-ae24-bc1c5798a229",
+      "name": "submit - Queue investigation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2016,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d=$input.first().json;\nconst esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst id=d.case_id||'';\nconst html='<main style=\"max-width:760px;margin:24px auto;padding:28px;border:1px solid #e2e8f0;border-radius:16px;font-family:system-ui,sans-serif;color:#0f172a;line-height:1.7\"><h1>'+(d.updated?'Case updated':'Investigation recorded')+'</h1><p>'+(d.updated?'Your case update has been saved.':'Your IP was submitted successfully. Cached findings may be available immediately; new lookups are processed by the queue.')+'</p><h2 style=\"font-size:16px\">Investigation ID</h2><p style=\"padding:14px;background:#f1f5f9;overflow-wrap:anywhere\"><code>'+esc(id)+'</code></p><p>Keep this ID. Return to the workspace and choose <strong>report</strong> to see findings, or <strong>case</strong> to add notes and change status.</p><p><a href=\"/form/ip-intelligence\">Return to workspace</a></p></main>';\nreturn [{json:{...d,html}}];"
+      },
+      "id": "403c033c-a7e0-4764-bd52-dafa45b12643",
+      "name": "submit - Render result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $json.html }}"
+      },
+      "id": "1ab39396-e160-4034-a166-d8255a5b5f76",
+      "name": "submit - Display result",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        2464,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const x=$input.first().json;if(!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(x.supabase_url||''))throw new Error('Set supabase_url in Connection settings to your Supabase project URL before running.');return [{json:x}];"
+      },
+      "id": "704a5ac6-6f7c-467a-a4a9-493d7c2d3ce7",
+      "name": "worker - Check connection settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"action\":\"claim\",\"payload\":{}}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "08409697-4e58-4915-8a61-578c4cec1686",
+      "name": "worker - Claim one eligible job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const x=$input.first().json;if(!x.available)return [];if(!['abuseipdb','virustotal','ipinfo'].includes(x.provider))throw new Error('Unknown provider');if(Date.parse(x.lease_until)<=Date.now()+30000)throw new Error('Lease too close to expiry');return [{json:x}];"
+      },
+      "id": "a354c3fe-0e0b-42a8-a5b0-bc2db282828c",
+      "name": "worker - Check claimed job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.provider }}",
+              "rightValue": "abuseipdb",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "51911f58-511a-48ca-9df2-e55eecc46f03",
+      "name": "worker - AbuseIPDB job?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        2016,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.abuseipdb.com/api/v2/check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ipAddress",
+              "value": "={{ $json.ip }}"
+            },
+            {
+              "name": "maxAgeInDays",
+              "value": "90"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "4858e914-81c8-4c0a-8c40-7b390c68b34c",
+      "name": "worker - Lookup AbuseIPDB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2464,
+        704
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.provider }}",
+              "rightValue": "virustotal",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a74a3676-d00d-4d60-aec6-189ee64c6aa1",
+      "name": "worker - VirusTotal job?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        2240,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const job=$('worker - Check claimed job').first().json;\nconst r=$input.first().json, code=Number(r.statusCode||0);let b=r.body;\nif(typeof b==='string'){try{b=JSON.parse(b);}catch{b=null;}}\nlet status='unavailable',evidence=null,reason='Provider unavailable or unexpected response';\nif(code===404){status='not_found';reason='No provider report';}\nelse if(code===429){status='rate_limited';reason='Provider request limit reached';}\nelse if(code===401||code===403){status='authentication_error';reason='Credential or permission issue; provider paused';}\nelse if(code===200){\n if(job.provider==='abuseipdb'&&Number.isFinite(b?.data?.abuseConfidenceScore)&&Number.isFinite(b?.data?.totalReports)){\n const d=b.data;status='ok';evidence={abuse_confidence:d.abuseConfidenceScore,total_reports:d.totalReports,last_reported_at:d.lastReportedAt??null,distinct_reporters:d.numDistinctUsers??null,report_window_days:90};\n }else if(job.provider==='virustotal'&&Number.isFinite(b?.data?.attributes?.last_analysis_stats?.malicious)&&Number.isFinite(b?.data?.attributes?.last_analysis_stats?.suspicious)){\n const a=b.data.attributes;status='ok';evidence={analysis_stats:a.last_analysis_stats,last_analysis_date:a.last_analysis_date??null,reputation:a.reputation??null};\n }else if(job.provider==='ipinfo'&&typeof b?.ip==='string'){\n status='ok';evidence={asn:b.asn??null,network_owner:b.as_name??null,country:b.country_code??null,bogon:b.bogon??false};\n }\n}\nif(status==='ok')reason='Provider evidence retrieved successfully';\nlet retry_at=null;\nif(code===429){const v=r.headers?.['retry-after'];if(v){const ms=/^\\d+$/.test(String(v))?Date.now()+Number(v)*1000:Date.parse(v);if(Number.isFinite(ms))retry_at=new Date(ms).toISOString();}}\nreturn [{json:{job_id:job.job_id,token:job.token,retry_at,result:{status,http_status:code||null,reason,evidence,retrieved_at:new Date().toISOString()}}}];"
+      },
+      "id": "beb9e484-11e5-4462-bf56-abe1d2cd4cfc",
+      "name": "worker - Normalize provider evidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"finish\", payload: $json }) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "bc73eb88-ea54-4c13-b6db-d7123990e108",
+      "name": "worker - Commit result and release job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2912,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://www.virustotal.com/api/v3/ip_addresses/' + encodeURIComponent($json.ip) }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        },
+        "nodeCredentialType": "virusTotalApi"
+      },
+      "id": "817aadc7-aab9-42fd-a4b5-6b4d7facce06",
+      "name": "worker - Lookup VirusTotal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2464,
+        896
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.ipinfo.io/lite/' + encodeURIComponent($json.ip) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "394af421-492e-49c2-be32-3e5e1b638931",
+      "name": "worker - Lookup IPinfo Lite",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2464,
+        1088
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const x=$input.first().json;if(!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(x.supabase_url||''))throw new Error('Set supabase_url in Connection settings to your Supabase project URL before running.');return [{json:x}];"
+      },
+      "id": "3fcf5dcb-071f-4852-a96c-be493ddf6b9c",
+      "name": "report - Check connection settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"report\", payload: { case_id: $(\"System configuration\").first().json.case_id } }) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "832d2088-4576-4a62-a401-31801ddb9206",
+      "name": "report - Read evidence and timeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d=$input.first().json;\nif(d.found===false)return [{json:{...d,assessment:'not_found',reasons:['No investigation matches this ID.'],assessment_history:[],analyst_reviews:[]}}];\nif(!d.assessment_id||!d.rules_version)throw new Error('The database did not return a saved assessment. Check the analyst-layer migration.');\nreturn [{json:d}];"
+      },
+      "id": "76d49e2a-3413-4eb8-a1e0-9ead5f0dc1a8",
+      "name": "report - Assess evidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d=$input.first().json;\nconst esc=v=>String(v??'—').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst date=v=>{if(!v)return 'Not available';const x=new Date(typeof v==='number'?v*1000:v);return Number.isNaN(x.getTime())?'Not available':x.toISOString().replace('T',' ').replace(/\\.\\d{3}Z$/,' UTC');};\nconst c=d.case||{},s=d.sources||{},a=s.abuseipdb||{},v=s.virustotal||{},i=s.ipinfo||{},ae=a.evidence||{},ve=v.evidence||{},ie=i.evidence||{},stats=ve.analysis_stats||{};\nconst flagged=Number(stats.malicious||0)+Number(stats.suspicious||0);\nlet title=({suspicious:'Review recommended',conflicting_evidence:'Conflicting evidence — review needed',isolated_signal:'Isolated signal — verify',cross_source_signals:'Signals across sources — investigate',multiple_vendor_signals:'Multiple vendor signals — review',abuse_signal:'Elevated abuse signal — investigate',outdated_evidence:'Evidence needs refreshing',pending:'Investigation in progress',inconclusive:'Evidence incomplete',no_known_malicious_evidence:'No known malicious evidence',not_found:'Investigation not found'})[d.assessment]||'Investigation report';\nlet summary=(d.reasons||[]).join(' ');\nif(v.status==='ok'&&flagged===1&&a.status==='ok'&&ae.abuse_confidence===0)summary='One VirusTotal vendor flagged this IP, while AbuseIPDB reports 0/100 abuse confidence. The sources disagree. Review the evidence before taking action; this is not a confirmed malicious verdict.';\nelse if(d.assessment==='suspicious')summary='One or more configured investigation rules found indicators that warrant review. Provider findings are evidence to investigate, not proof of malicious activity.';\nconst color=['suspicious','conflicting_evidence','isolated_signal','cross_source_signals','multiple_vendor_signals','abuse_signal'].includes(d.assessment)?'#92400e':d.assessment==='no_known_malicious_evidence'?'#065f46':'#334155';\nconst label=p=>({abuseipdb:'AbuseIPDB',virustotal:'VirusTotal',ipinfo:'IPinfo Lite'})[p]||p;\nconst status=x=>({ok:'Evidence available',not_found:'No report found',not_configured:'Not enabled',queued:'Queued',running:'Processing',rate_limited:'Rate limited',authentication_error:'Credential error',unavailable:'Unavailable',failed:'Lookup failed'})[x]||x||'Unknown';\nconst row=(k,val)=>'<tr><th style=\"text-align:left;padding:9px 12px;border-bottom:1px solid #e2e8f0;font-weight:500;color:#475569\">'+esc(k)+'</th><td style=\"padding:9px 12px;border-bottom:1px solid #e2e8f0\">'+esc(val)+'</td></tr>';\nconst table=rows=>'<table style=\"width:100%;border-collapse:collapse;font-size:14px\">'+rows+'</table>';\nconst card=(heading,body)=>'<section style=\"background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:16px 0\"><h2 style=\"font-size:18px;margin:0 0 14px\">'+esc(heading)+'</h2>'+body+'</section>';\nlet html='<main style=\"max-width:980px;margin:20px auto;padding:24px;font-family:system-ui,sans-serif;color:#0f172a;background:#f8fafc;border-radius:16px;line-height:1.6\">';\nhtml+='<p style=\"font-size:12px;letter-spacing:2px;color:#64748b\">IP INTELLIGENCE WORKSPACE</p><h1 style=\"font-size:30px;margin:8px 0\">Investigation: '+esc(c.ip||'Unknown IP')+'</h1>';\nhtml+='<section style=\"padding:18px;border-radius:10px;background:#f1f5f9;border-left:5px solid '+color+'\"><strong style=\"font-size:20px;color:'+color+'\">'+esc(title)+'</strong><p style=\"margin:8px 0\">'+esc(summary)+'</p></section>';\nif(d.found===false){html+='<p>Check the investigation ID and try again.</p></main>';return [{json:{...d,html}}];}\nhtml+=card('Investigation details',table(row('Investigation ID',c.id)+row('Case status',c.status)+row('Assigned analyst',c.owner_name||'Unassigned')+row('Reason',c.reason||'Not provided')+row('Created',date(c.created_at))+row('Report generated',date(d.generated_at))+row('Rules version',d.rules_version)+row('Evidence quality',d.evidence_quality)+row('Assessment ID',d.assessment_id)));\nhtml+=card('Network context',table(row('Network owner',ie.network_owner)+row('ASN',ie.asn)+row('Country code',ie.country))+ '<p style=\"font-size:13px;color:#64748b\">Network ownership and country are context, not reputation verdicts.</p>');\nlet findings='';\nfor(const [p,source] of Object.entries(s)){\n let rows=row('Lookup status',status(source.status));\n if(source.status==='ok'&&p==='virustotal')rows+=row('Vendors reporting malicious',stats.malicious??0)+row('Vendors reporting suspicious',stats.suspicious??0)+row('Vendors reporting harmless',stats.harmless??0)+row('Vendors with no detection',stats.undetected??0)+row('Vendor timeouts',stats.timeout??0)+row('Underlying analysis date',date(ve.last_analysis_date));\n if(source.status==='ok'&&p==='abuseipdb')rows+=row('Abuse confidence',String(ae.abuse_confidence??'—')+' / 100')+row('Reports in '+(ae.report_window_days||90)+' days',ae.total_reports)+row('Distinct reporters',ae.distinct_reporters)+row('Last abuse report',date(ae.last_reported_at));\n rows+=row('Retrieved',date(source.checked_at||source.retrieved_at))+row('Evidence source',source.from_cache?'Cached result':'Live lookup');\n findings+='<h3 style=\"font-size:16px;margin:18px 0 8px\">'+esc(label(p))+'</h3>'+table(rows);\n}\nfindings+='<p style=\"font-size:13px;color:#64748b\">Vendor results may overlap or contain false positives. “No detection” does not mean a vendor judged the IP harmless. Abuse report counts and abuse confidence are different measures.</p>';\nhtml+=card('Source findings',findings);\nif(d.age_warnings?.length)html+=card('Evidence freshness','<ul>'+d.age_warnings.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>');\nhtml+=card('Recommended next step','<p>'+esc(d.recommendation)+'</p><p>Reputation coverage: '+(d.coverage_complete?'Both reputation providers returned evidence.':'Some reputation evidence is missing.')+'</p>');\nconst dispositionLabels={under_review:'Under review',confirmed_malicious:'Confirmed malicious activity',confirmed_benign:'Confirmed benign activity',insufficient_evidence:'Insufficient evidence',duplicate:'Duplicate investigation'};\nhtml+=card('Analyst decisions',(d.analyst_reviews||[]).length?(d.analyst_reviews||[]).map(r=>'<article style=\"border-bottom:1px solid #e2e8f0;padding:12px 0\"><strong>'+esc(dispositionLabels[r.disposition]||r.disposition)+'</strong><p>'+esc(r.explanation)+'</p><small>Reviewed by '+esc(r.actor_name)+' · '+esc(date(r.created_at))+' · Case '+esc(r.case_status)+'</small></article>').join(''):'<p>No analyst decision recorded. The automated assessment is separate from a human decision. Choose case in the workspace to record your review.</p>');\nhtml+=card('Assessment history',(d.assessment_history||[]).map(a=>'<p><strong>'+esc(String(a.conclusion?.assessment||'').replaceAll('_',' '))+'</strong> · Rules '+esc(a.rules_version)+' · '+esc(date(a.created_at))+'<br><small>Assessment '+esc(a.id)+'</small></p>').join('')+'<p style=\"font-size:13px;color:#64748b\">Assessments retain their evidence and rule version. A changed conclusion is saved as another entry; earlier snapshots are preserved. Showing the latest 20 entries.</p>');\n\nhtml+=card('Activity history',(d.timeline||[]).map(t=>'<p><strong>'+esc(t.event.replaceAll('_',' '))+'</strong> · '+esc(date(t.created_at))+(t.details?.provider?' · '+esc(label(t.details.provider)):'')+(t.details?.note?'<br>'+esc(t.details.note):'')+'</p>').join('')||'<p>No activity recorded.</p>');\nhtml+='<details style=\"margin-top:20px\"><summary style=\"cursor:pointer\">Technical data (JSON)</summary><pre style=\"white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;background:#e2e8f0;font-size:12px\">'+esc(JSON.stringify(d,null,2))+'</pre></details>';\nhtml+='<p><a href=\"/form/ip-intelligence\" style=\"color:#2563eb\">Return to workspace</a></p></main>';\nreturn [{json:{...d,html}}];"
+      },
+      "id": "27b2060a-33de-4a1d-a9f3-a77e3c71792a",
+      "name": "report - Render result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $json.html }}"
+      },
+      "id": "5d703d36-68e5-407a-8388-85257a257142",
+      "name": "report - Display result",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        2240,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const x=$input.first().json;if(!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(x.supabase_url||''))throw new Error('Set supabase_url in Connection settings to your Supabase project URL before running.');return [{json:x}];"
+      },
+      "id": "71dbb099-f2a5-484c-b932-5c60e0a52900",
+      "name": "case - Check connection settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"case_update\", payload: { case_id: $(\"System configuration\").first().json.case_id, status: $(\"System configuration\").first().json.status, disposition: $(\"System configuration\").first().json.disposition, owner: $(\"System configuration\").first().json.owner, note: $(\"System configuration\").first().json.note, actor: $(\"System configuration\").first().json.actor } }) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "251191b3-a202-4e22-9cd6-028c4135e70c",
+      "name": "case - Record case update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d=$input.first().json;\nconst esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst id=d.case_id||'';\nconst html='<main style=\"max-width:760px;margin:24px auto;padding:28px;border:1px solid #e2e8f0;border-radius:16px;font-family:system-ui,sans-serif;color:#0f172a;line-height:1.7\"><h1>'+(d.updated?'Case updated':'Investigation recorded')+'</h1><p>'+(d.updated?'Your case update has been saved.':'Your IP was submitted successfully. Cached findings may be available immediately; new lookups are processed by the queue.')+'</p><h2 style=\"font-size:16px\">Investigation ID</h2><p style=\"padding:14px;background:#f1f5f9;overflow-wrap:anywhere\"><code>'+esc(id)+'</code></p><p>Keep this ID. Return to the workspace and choose <strong>report</strong> to see findings, or <strong>case</strong> to add notes and change status.</p><p><a href=\"/form/ip-intelligence\">Return to workspace</a></p></main>';\nreturn [{json:{...d,html}}];"
+      },
+      "id": "bec437ca-ceb9-48c7-9579-8014e72a64b3",
+      "name": "case - Render result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $json.html }}"
+      },
+      "id": "4ed75f94-0ac6-4b82-ac5d-4df68b470c84",
+      "name": "case - Display result",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        2016,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const x=$input.first().json;if(!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(x.supabase_url||''))throw new Error('Set supabase_url in Connection settings to your Supabase project URL before running.');return [{json:x}];"
+      },
+      "id": "1a294852-9092-467d-b9f8-9fbcad77b7c2",
+      "name": "ops - Check connection settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"action\":\"metrics\",\"payload\":{}}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "5c01e318-9db1-4e4d-b843-50251856c638",
+      "name": "ops - Read operational metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        1280
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d=$input.first().json;return [{json:{...d,attention:(d.providers||[]).filter(p=>!p.enabled||p.requests_today>=p.daily_limit||p.last_status==='authentication_error'),backlog:Number(d.jobs?.queued||0),failed_jobs:Number(d.jobs?.failed||0)}}];"
+      },
+      "id": "324c328b-e878-4eee-9b5d-2a6f8dc8bf05",
+      "name": "ops - Operations report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        1280
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const x=$input.first().json;if(!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(x.supabase_url||''))throw new Error('Set supabase_url in Connection settings to your Supabase project URL before running.');return [{json:x}];"
+      },
+      "id": "11f85553-d7da-4e4b-8ecc-06b110b2436f",
+      "name": "maintenance - Check connection settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"action\":\"maintenance\",\"payload\":{}}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "be6b515e-ee4c-4a10-882b-7cb1bf7008db",
+      "name": "maintenance - Apply retention policy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"provider\":\"abuseipdb\",\"enabled\":false}",
+        "options": {}
+      },
+      "id": "b2d9f865-90c3-41e1-ba76-b3859a2f4c77",
+      "name": "enable - Provider choice",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1344,
+        1664
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const x=$input.first().json;if(!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(x.supabase_url||''))throw new Error('Set supabase_url in Connection settings to your Supabase project URL before running.');return [{json:x}];"
+      },
+      "id": "c7a88744-e591-4fd4-93a9-25e73445797f",
+      "name": "enable - Check connection settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        1664
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('System configuration').first().json.supabase_url + '/rest/v1/rpc/ipintel_api' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"configure\", payload: { provider: $(\"enable - Provider choice\").first().json.provider, enabled: $(\"enable - Provider choice\").first().json.enabled } }) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "55e41f60-f7aa-4574-bfa9-12652a785319",
+      "name": "enable - Set provider availability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1792,
+        1664
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{json:{demo:true,found:true,case:{id:'DEMO-NOT-A-REAL-CASE',ip:'192.0.2.10',status:'open'},sources:{abuseipdb:{status:'ok',evidence:{abuse_confidence:85,total_reports:20}},virustotal:{status:'ok',evidence:{analysis_stats:{malicious:3,suspicious:1}}},ipinfo:{status:'ok',evidence:{network_owner:'Synthetic example network'}}},timeline:[],notice:'Synthetic fixture. No external requests or database writes.'}}];"
+      },
+      "id": "ce6545ce-9973-49a2-9f7d-fbafa0e6c017",
+      "name": "demo - Synthetic evidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d=$input.first().json;\nconst sources=d.sources||{},a=sources.abuseipdb,v=sources.virustotal,reasons=[];\nif(a?.status==='ok'&&a.evidence?.abuse_confidence>=50&&a.evidence?.total_reports>0)reasons.push('AbuseIPDB confidence >= 50 with reported abuse.');\nif(v?.status==='ok'&&(v.evidence?.analysis_stats?.malicious>0||v.evidence?.analysis_stats?.suspicious>0))reasons.push('VirusTotal vendors report malicious or suspicious activity.');\nconst pending=Object.values(sources).some(s=>['queued','running'].includes(s?.status));\nconst covered=a?.status==='ok'&&v?.status==='ok';\nconst verdict=d.found===false?'not_found':reasons.length?'suspicious':pending?'pending':covered?'no_known_malicious_evidence':'inconclusive';\nif(!reasons.length)reasons.push(covered?'No evidence met the project rules. This does not establish safety.':'Reputation evidence is incomplete.');\nconst ageWarnings=[];\nfor(const [p,s] of Object.entries(sources)){const t=s?.evidence?.last_reported_at||(s?.evidence?.last_analysis_date?new Date(s.evidence.last_analysis_date*1000).toISOString():null);if(t&&Date.now()-Date.parse(t)>30*86400000)ageWarnings.push(p+': underlying observation is more than 30 days old.');}\nreturn [{json:{...d,assessment:verdict,rules_version:'1.0',reasons,age_warnings:ageWarnings,coverage_complete:covered,recommendation:'Review evidence dates and associated activity before taking action. No automatic blocking.',generated_at:new Date().toISOString()}}];"
+      },
+      "id": "ec529696-013f-42d3-9144-cd19ba5447fd",
+      "name": "demo - Assess evidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d=$input.first().json;const esc=s=>String(s).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));const title=d.assessment||d.message||'Investigation result';return [{json:{...d,html:'<h1>IP Investigation</h1><h2>'+esc(title)+'</h2><p>Keep the case ID to retrieve or update this investigation.</p><pre>'+esc(JSON.stringify(d,null,2))+'</pre>'}}];"
+      },
+      "id": "9c4b5c6a-1de9-460d-9ee6-754aa4f50a94",
+      "name": "demo - Render result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        1856
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a11dc31a-97f7-4975-90af-f2ce7fbf951f",
+      "name": "Operator console",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "action",
+              "name": "action",
+              "type": "string",
+              "value": "demo"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ab0d75e8-5d2c-4c7c-9c48-0c1050fb39a9",
+      "name": "Console action",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        288,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "url",
+              "name": "supabase_url",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "e3014fb2-be55-440e-b6f1-947604c28177",
+      "name": "System configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        816,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "IP Intelligence Workspace",
+        "formDescription": "Choose submit to investigate an IP, report to view existing findings, or case to update an investigation. The next page shows only the details you need.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "What would you like to do?",
+              "fieldName": "action",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "submit"
+                  },
+                  {
+                    "option": "report"
+                  },
+                  {
+                    "option": "case"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "appendAttribution": false,
+          "buttonLabel": "Continue",
+          "includeUserInOutput": true,
+          "path": "ip-intelligence",
+          "ignoreBots": true
+        },
+        "authentication": "n8nUserAuth",
+        "requireExecuteAccess": true
+      },
+      "id": "99fd1a85-3bb3-42a3-8a15-e4ac061b7175",
+      "name": "Investigation portal",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const initial=$('Investigation portal').first().json;\nconst x={...initial,...$input.first().json,action:initial.action,user:initial.user};\nconst u=initial.user;\nx.actor=u?.id?{id:String(u.id),name:[u.firstName,u.lastName].filter(Boolean).join(' ')||String(u.email||u.id),source:'n8n_authenticated_user'}:null;\nif(!['submit','report','case'].includes(x.action))throw new Error('Unsupported portal action');\nif(x.action==='submit'&&!x.ip)throw new Error('Enter a public IP');\nif(x.action!=='submit'&&!x.case_id)throw new Error('Enter the investigation ID');\nif(x.action==='case'){\n if(!x.actor)throw new Error('Sign in to the production portal to record an attributed analyst review. Manual test executions do not establish reviewer identity.');\n const labels={'Under review':'under_review','Confirmed malicious activity':'confirmed_malicious','Confirmed benign activity':'confirmed_benign','Insufficient evidence':'insufficient_evidence','Duplicate investigation':'duplicate'};\n x.disposition=labels[x.disposition]||x.disposition;\n if(!Object.values(labels).includes(x.disposition))throw new Error('Choose an analyst disposition');\n if(x.status==='closed'&&x.disposition==='under_review')throw new Error('Choose a final disposition before closing the case');\n if(String(x.note||'').trim().length<3)throw new Error('Explain your analyst decision');\n}\nreturn [{json:x}];"
+      },
+      "id": "848c2ae1-508b-45fb-a89c-77447f8d8e92",
+      "name": "Validate portal action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "1cfdb01e-1bcb-494d-b295-bc4866a6b83b",
+      "name": "Queue schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "action",
+              "name": "action",
+              "type": "string",
+              "value": "worker"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9bd563f4-df35-4554-9a12-a8a8ddc94a77",
+      "name": "Queue action",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        288,
+        1184
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "setup",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "submit",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "worker",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "report",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "case",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "ops",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "maintenance",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "enable",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "demo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unsupported action"
+        }
+      },
+      "id": "73b39a1c-3f89-4451-be05-c3b6ac94a81b",
+      "name": "Route system action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        1040,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "throw new Error('Choose demo, setup, ops, maintenance, enable, submit, report, case or worker.');"
+      },
+      "id": "dcf53065-902c-432f-9f0e-c5b5bac7c572",
+      "name": "Reject unsupported command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{json:{\"schema_version\":\"2.1\",\"supabase_sql\":\"\\nbegin;\\ncreate schema if not exists ipintel;\\ncreate table if not exists ipintel.providers(\\n name text primary key, enabled boolean not null default false,\\n daily_limit int not null default 100 check(daily_limit between 1 and 100),\\n day date not null default (now() at time zone 'UTC')::date,\\n used int not null default 0, next_at timestamptz not null default now(),\\n ttl_seconds int not null, last_status text);\\ninsert into ipintel.providers(name,ttl_seconds) values ('abuseipdb',21600),('virustotal',21600),('ipinfo',604800) on conflict do nothing;\\ncreate table if not exists ipintel.cases(\\n id uuid primary key default gen_random_uuid(), request_key text unique not null,\\n ip inet not null, reason text not null default '', status text not null default 'open'\\n check(status in ('open','investigating','closed')), owner_name text not null default '',\\n created_at timestamptz not null default now(), updated_at timestamptz not null default now());\\ncreate table if not exists ipintel.jobs(\\n id uuid primary key default gen_random_uuid(), ip inet not null,\\n provider text not null references ipintel.providers(name), status text not null default 'queued'\\n check(status in ('queued','running','done','failed')), attempts int not null default 0,\\n due_at timestamptz not null default now(), lease_until timestamptz, token uuid,\\n result jsonb, created_at timestamptz not null default now());\\ncreate unique index if not exists ipintel_active_job on ipintel.jobs(ip,provider) where status in ('queued','running');\\ncreate index if not exists ipintel_due_jobs on ipintel.jobs(status,due_at);\\ncreate table if not exists ipintel.case_sources(\\n case_id uuid references ipintel.cases(id) on delete cascade, provider text not null,\\n job_id uuid references ipintel.jobs(id), evidence jsonb, primary key(case_id,provider));\\ncreate index if not exists ipintel_case_sources_job on ipintel.case_sources(job_id);\\ncreate index if not exists ipintel_cases_created on ipintel.cases(created_at);\\ncreate table if not exists ipintel.cache(\\n ip inet not null,provider text not null,result jsonb not null, expires_at timestamptz not null,\\n primary key(ip,provider));\\ncreate table if not exists ipintel.audit(\\n id bigint generated always as identity primary key,case_id uuid references ipintel.cases(id) on delete cascade,\\n event text not null,details jsonb not null default '{}',created_at timestamptz not null default now());\\ncreate index if not exists ipintel_audit_case_time on ipintel.audit(case_id,created_at desc);\\nalter table ipintel.providers enable row level security;\\nalter table ipintel.cases enable row level security;\\nalter table ipintel.jobs enable row level security;\\nalter table ipintel.case_sources enable row level security;\\nalter table ipintel.cache enable row level security;\\nalter table ipintel.audit enable row level security;\\nrevoke all on schema ipintel from public,anon,authenticated;\\ncreate or replace function public.ipintel_api(action text,payload jsonb default '{}'::jsonb)\\nreturns jsonb language plpgsql security definer set search_path='' as $fn$\\ndeclare\\n c ipintel.cases%rowtype; j ipintel.jobs%rowtype; p ipintel.providers%rowtype;\\n addr inet; cid uuid; jid uuid; ev jsonb; n int; result_status text;\\n next_time timestamptz; requested_time timestamptz; today date := (now() at time zone 'UTC')::date;\\nbegin\\n if action='enqueue' then\\n  if length(coalesce(payload->>'request_key','')) not between 1 and 150 then raise exception 'A request key is required'; end if;\\n  addr:=(payload->>'ip')::inet;\\n  if masklen(addr)<>(case when family(addr)=4 then 32 else 128 end) then raise exception 'A single IP is required'; end if;\\n  if family(addr)=4 then\\n   if addr <<= any(array['0.0.0.0/8','10.0.0.0/8','100.64.0.0/10','127.0.0.0/8','169.254.0.0/16','172.16.0.0/12','192.0.0.0/24','192.0.2.0/24','192.88.99.0/24','192.168.0.0/16','198.18.0.0/15','198.51.100.0/24','203.0.113.0/24','224.0.0.0/4','240.0.0.0/4']::inet[]) then raise exception 'Special-use IP excluded'; end if;\\n  elsif not addr <<= '2000::/3'::inet or addr <<= any(array['2001::/23','2001:db8::/32','2002::/16','3fff::/20']::inet[]) then raise exception 'Special-use IPv6 excluded'; end if;\\n  perform pg_advisory_xact_lock(719210);\\n  select * into c from ipintel.cases where request_key=payload->>'request_key';\\n  if found then\\n   if c.ip<>addr then raise exception 'Request key already belongs to a different IP'; end if;\\n   return jsonb_build_object('case_id',c.id,'duplicate',true);\\n  end if;\\n  if (select count(*) from ipintel.cases where created_at>=now()-interval '1 day')>=200 then raise exception 'Submission budget reached; retry later';end if;\\n  insert into ipintel.cases(request_key,ip,reason) values(payload->>'request_key',addr,left(coalesce(payload->>'reason',''),2000)) returning id into cid;\\n  for p in select * from ipintel.providers order by name loop\\n   ev:=null;jid:=null;\\n   select result into ev from ipintel.cache where ip=addr and provider=p.name and expires_at>now();\\n   if ev is not null then ev:=ev||'{\\\"from_cache\\\":true}'::jsonb;\\n   elsif not p.enabled then ev:=jsonb_build_object('status','not_configured','reason','Provider is disabled');\\n   else\\n    insert into ipintel.jobs(ip,provider) values(addr,p.name)\\n     on conflict(ip,provider) where status in ('queued','running') do update set ip=excluded.ip returning id into jid;\\n   end if;\\n   insert into ipintel.case_sources(case_id,provider,job_id,evidence) values(cid,p.name,jid,ev);\\n  end loop;\\n  insert into ipintel.audit(case_id,event,details) values(cid,'submitted',jsonb_build_object('source','n8n','ip',host(addr)));\\n  return jsonb_build_object('case_id',cid,'duplicate',false,'message','Investigation recorded. Save this ID to retrieve results.');\\n elsif action='claim' then\\n  if not pg_try_advisory_xact_lock(719211) then return '{\\\"available\\\":false}'::jsonb;end if;\\n  update ipintel.jobs set status='failed',result='{\\\"status\\\":\\\"unavailable\\\",\\\"reason\\\":\\\"Worker lease expired after maximum attempts\\\"}'::jsonb,token=null\\n    where status='running' and lease_until<now() and attempts>=3;\\n  update ipintel.jobs set status='queued',due_at=now(),token=null where status='running' and lease_until<now() and attempts<3;\\n  for p in select * from ipintel.providers where enabled order by next_at,name for update loop\\n   if p.day<>today then update ipintel.providers set day=today,used=0 where name=p.name;p.used:=0;end if;\\n   if p.used>=p.daily_limit or p.next_at>now() then continue;end if;\\n   select * into j from ipintel.jobs where provider=p.name and status='queued' and due_at<=now() order by due_at,created_at limit 1 for update skip locked;\\n   if not found then continue;end if;\\n   update ipintel.jobs set status='running',attempts=attempts+1,token=gen_random_uuid(),lease_until=now()+interval '10 minutes' where id=j.id returning * into j;\\n   update ipintel.providers set used=used+1,next_at=now()+interval '60 seconds' where name=p.name;\\n   return jsonb_build_object('available',true,'job_id',j.id,'token',j.token,'ip',host(j.ip),'provider',j.provider,'attempt',j.attempts,'lease_until',j.lease_until);\\n  end loop;\\n  return '{\\\"available\\\":false}'::jsonb;\\n elsif action='finish' then\\n  perform pg_advisory_xact_lock(719211);\\n  select * into j from ipintel.jobs where id=(payload->>'job_id')::uuid for update;\\n  if not found then raise exception 'Unknown job';end if;\\n  if j.token is null or (payload->>'token') is null or j.token is distinct from (payload->>'token')::uuid then return '{\\\"accepted\\\":false,\\\"reason\\\":\\\"stale lease\\\"}'::jsonb;end if;\\n  if j.status in ('done','failed') then return '{\\\"accepted\\\":true,\\\"duplicate\\\":true}'::jsonb;end if;\\n  if j.status<>'running' or j.lease_until is null or j.lease_until<now() then return '{\\\"accepted\\\":false,\\\"reason\\\":\\\"expired lease\\\"}'::jsonb;end if;\\n  ev:=payload->'result';result_status:=ev->>'status';\\n  if result_status is null or result_status not in ('ok','not_found','unavailable','rate_limited','authentication_error') then raise exception 'Invalid result status';end if;\\n  if octet_length(ev::text)>50000 then raise exception 'Result exceeds storage limit';end if;\\n  select * into p from ipintel.providers where name=j.provider for update;\\n  if result_status in ('ok','not_found') then\\n   ev:=ev||jsonb_build_object('checked_at',now(),'from_cache',false);\\n   update ipintel.jobs set status='done',result=ev where id=j.id;\\n   insert into ipintel.cache(ip,provider,result,expires_at) values(j.ip,j.provider,ev,now()+make_interval(secs=>case when result_status='not_found' then 3600 else p.ttl_seconds end))\\n    on conflict(ip,provider) do update set result=excluded.result,expires_at=excluded.expires_at;\\n  else\\n   next_time:=now()+make_interval(secs=>case when result_status='rate_limited' then 3600 else 60*power(2,j.attempts)::int end);\\n   if payload->>'retry_at' is not null then\\n    begin requested_time:=(payload->>'retry_at')::timestamptz; next_time:=greatest(next_time,requested_time);exception when others then null;end;\\n   end if;\\n   update ipintel.providers set next_at=greatest(next_at,next_time),enabled=case when result_status='authentication_error' then false else enabled end where name=j.provider;\\n   update ipintel.jobs set status=case when j.attempts>=3 or result_status='authentication_error' then 'failed' else 'queued' end,due_at=next_time,result=ev where id=j.id;\\n  end if;\\n  update ipintel.providers set last_status=result_status where name=j.provider;\\n  insert into ipintel.audit(case_id,event,details) select case_id,'provider_result',jsonb_build_object('provider',j.provider,'status',result_status,'attempt',j.attempts) from ipintel.case_sources where job_id=j.id;\\n  return jsonb_build_object('accepted',true,'job_id',j.id,'result_status',result_status);\\n elsif action='report' then\\n  select * into c from ipintel.cases where id=(payload->>'case_id')::uuid;\\n  if not found then return '{\\\"found\\\":false}'::jsonb;end if;\\n  return jsonb_build_object('found',true,'case',to_jsonb(c),'sources',\\n   (select jsonb_object_agg(s.provider,coalesce(s.evidence,\\n      case when jobrow.status in ('done','failed') then jobrow.result else jsonb_build_object('status',jobrow.status,'attempts',jobrow.attempts,'retry_at',jobrow.due_at,'last_result',jobrow.result) end))\\n    from ipintel.case_sources s left join ipintel.jobs jobrow on jobrow.id=s.job_id where s.case_id=c.id),\\n   'timeline',(select coalesce(jsonb_agg(x),'[]'::jsonb) from (select event,details,created_at from ipintel.audit where case_id=c.id order by created_at desc limit 100)x));\\n elsif action='case_update' then\\n  select * into c from ipintel.cases where id=(payload->>'case_id')::uuid for update;\\n  if not found then raise exception 'Case not found';end if;\\n  if coalesce(payload->>'status','') not in ('open','investigating','closed') then raise exception 'Invalid case status';end if;\\n  if length(trim(coalesce(payload->>'note','')))<3 then raise exception 'A note is required for every update';end if;\\n  update ipintel.cases set status=payload->>'status',owner_name=left(coalesce(payload->>'owner',''),100),updated_at=now() where id=c.id;\\n  insert into ipintel.audit(case_id,event,details) values(c.id,'case_updated',jsonb_build_object('previous_status',c.status,'status',payload->>'status','owner',left(coalesce(payload->>'owner',''),100),'note',left(payload->>'note',2000)));\\n  return jsonb_build_object('updated',true,'case_id',c.id);\\n elsif action='metrics' then\\n  return jsonb_build_object('generated_at',now(),'providers',(select jsonb_agg(to_jsonb(x)) from (select name,enabled,daily_limit,case when day=today then used else 0 end as requests_today,next_at,last_status from ipintel.providers)x),\\n   'jobs',(select coalesce(jsonb_object_agg(status,n),'{}'::jsonb) from (select status,count(*) n from ipintel.jobs group by status)x),\\n   'cases',(select coalesce(jsonb_object_agg(status,n),'{}'::jsonb) from (select status,count(*) n from ipintel.cases group by status)x),\\n   'oldest_queued_at',(select min(created_at) from ipintel.jobs where status='queued'),\\n   'cache_entries',(select count(*) from ipintel.cache),\\n   'recent_cases',(select coalesce(jsonb_agg(x),'[]'::jsonb) from (select id,host(ip) as ip,status,created_at from ipintel.cases order by created_at desc limit 25)x));\\n elsif action='configure' then\\n  if coalesce(payload->>'provider','') not in ('abuseipdb','virustotal','ipinfo') then raise exception 'Unknown provider';end if;\\n  update ipintel.providers set enabled=(payload->>'enabled')::boolean,next_at=greatest(next_at,now()) where name=payload->>'provider';\\n  return '{\\\"updated\\\":true}'::jsonb;\\n elsif action='maintenance' then\\n  delete from ipintel.cases where status='closed' and updated_at<now()-interval '90 days';\\n  delete from ipintel.cache where expires_at<now()-interval '7 days';\\n  delete from ipintel.jobs stalejob where status in ('done','failed') and created_at<now()-interval '7 days' and not exists(select 1 from ipintel.case_sources s where s.job_id=stalejob.id);\\n  return '{\\\"completed\\\":true,\\\"policy\\\":\\\"Closed cases older than 90 days; expired cache older than 7 days; unreferenced completed jobs older than 7 days\\\"}'::jsonb;\\n else raise exception 'Unknown action';\\n end if;\\nend;\\n$fn$;\\nrevoke all on function public.ipintel_api(text,jsonb) from public,anon,authenticated;\\ngrant execute on function public.ipintel_api(text,jsonb) to service_role;\\ncommit;\\n\\n\\ncreate table ipintel.assessments(\\n id uuid primary key default gen_random_uuid(),\\n case_id uuid not null references ipintel.cases(id) on delete cascade,\\n rules_version text not null,\\n fingerprint text not null,\\n evidence jsonb not null,\\n conclusion jsonb not null,\\n created_at timestamptz not null default now(),\\n unique(case_id,rules_version,fingerprint)\\n);\\ncreate index ipintel_assessments_case_time on ipintel.assessments(case_id,created_at desc);\\ncreate table ipintel.reviews(\\n id uuid primary key default gen_random_uuid(),\\n case_id uuid not null references ipintel.cases(id) on delete cascade,\\n assessment_id uuid references ipintel.assessments(id),\\n disposition text not null check(disposition in ('under_review','confirmed_malicious','confirmed_benign','insufficient_evidence','duplicate')),\\n explanation text not null check(length(trim(explanation))>=3),\\n actor_id text not null,\\n actor_name text not null,\\n actor_source text not null check(actor_source='n8n_authenticated_user'),\\n case_status text not null,\\n created_at timestamptz not null default now()\\n);\\ncreate index ipintel_reviews_case_time on ipintel.reviews(case_id,created_at desc);\\nalter table ipintel.assessments enable row level security;\\nalter table ipintel.reviews enable row level security;\\nrevoke all on ipintel.assessments,ipintel.reviews from public,anon,authenticated;\\ncreate function ipintel.reject_history_update() returns trigger language plpgsql set search_path='' as $$\\nbegin raise exception 'History records cannot be updated; append a new record instead';end;$$;\\ncreate trigger assessments_immutable before update on ipintel.assessments for each row execute function ipintel.reject_history_update();\\ncreate trigger reviews_immutable before update on ipintel.reviews for each row execute function ipintel.reject_history_update();\\nrevoke all on function ipintel.reject_history_update() from public,anon,authenticated;\\ncreate function ipintel.evaluate_evidence(sources jsonb) returns jsonb language plpgsql set search_path='' as $$\\ndeclare\\n a jsonb:=sources->'abuseipdb';v jsonb:=sources->'virustotal';\\n flags int:=0; confidence int:=0; reports int:=0;\\n covered boolean; pending boolean; stale boolean:=false; verdict text;\\n reasons jsonb:='[]';warnings jsonb:='[]'; stamp timestamptz;\\nbegin\\n covered:=coalesce(a->>'status'='ok' and v->>'status'='ok',false);\\n pending:=exists(select 1 from jsonb_each(sources) x where x.value->>'status' in ('queued','running'));\\n if v->>'status'='ok' then flags:=coalesce((v#>>'{evidence,analysis_stats,malicious}')::int,0)+coalesce((v#>>'{evidence,analysis_stats,suspicious}')::int,0);end if;\\n if a->>'status'='ok' then confidence:=coalesce((a#>>'{evidence,abuse_confidence}')::int,0);reports:=coalesce((a#>>'{evidence,total_reports}')::int,0);end if;\\n begin\\n  if v#>>'{evidence,last_analysis_date}' is not null then\\n   stamp:=to_timestamp((v#>>'{evidence,last_analysis_date}')::double precision);\\n   if stamp<now()-interval '30 days' then stale:=true;warnings:=warnings||jsonb_build_array('VirusTotal underlying analysis is more than 30 days old.');end if;\\n  elsif v->>'status'='ok' then warnings:=warnings||jsonb_build_array('VirusTotal underlying analysis date is unavailable.');end if;\\n exception when others then warnings:=warnings||jsonb_build_array('VirusTotal observation date could not be interpreted.');end;\\n begin\\n  if reports>0 and a#>>'{evidence,last_reported_at}' is not null and (a#>>'{evidence,last_reported_at}')::timestamptz<now()-interval '30 days' then\\n   stale:=true;warnings:=warnings||jsonb_build_array('The latest AbuseIPDB abuse report is more than 30 days old.');\\n  end if;\\n exception when others then warnings:=warnings||jsonb_build_array('AbuseIPDB observation date could not be interpreted.');end;\\n if confidence>=50 and reports>0 and flags>0 then verdict:='cross_source_signals';reasons:=reasons||jsonb_build_array('VirusTotal flags and elevated AbuseIPDB confidence both warrant investigation. These sources are not assumed independent.');\\n elsif confidence>=50 and reports>0 then verdict:='abuse_signal';reasons:=reasons||jsonb_build_array('AbuseIPDB confidence is at least 50 with reported abuse; verify the associated activity.');\\n elsif flags=1 and a->>'status'='ok' and confidence=0 then verdict:='conflicting_evidence';reasons:=reasons||jsonb_build_array('An isolated VirusTotal flag is not corroborated by AbuseIPDB current confidence of 0. Zero confidence does not establish that the IP is benign.');\\n elsif flags=1 then verdict:='isolated_signal';reasons:=reasons||jsonb_build_array('One VirusTotal vendor reported a flag. Treat it as an isolated signal requiring verification.');\\n elsif flags>1 then verdict:='multiple_vendor_signals';reasons:=reasons||jsonb_build_array('Multiple VirusTotal vendor flags warrant review; vendor results may overlap and are not independent proof.');\\n elsif pending then verdict:='pending';reasons:=reasons||jsonb_build_array('Provider jobs are still queued or running.');\\n elsif not covered then verdict:='inconclusive';reasons:=reasons||jsonb_build_array('Reputation evidence is incomplete.');\\n elsif stale then verdict:='outdated_evidence';reasons:=reasons||jsonb_build_array('No rule found a positive signal, but underlying evidence is old. Do not infer current safety.');\\n else verdict:='no_known_malicious_evidence';reasons:=reasons||jsonb_build_array('No available evidence met the project signal rules. This does not prove the IP is safe.');end if;\\n if not covered and verdict not in ('pending','inconclusive') then reasons:=reasons||jsonb_build_array('Some reputation evidence is missing; the assessment is partial.');end if;\\n return jsonb_build_object('assessment',verdict,'rules_version','2.0','reasons',reasons,'age_warnings',warnings,'coverage_complete',covered,\\n 'evidence_quality',case when not covered then 'partial' when stale then 'stale' else 'available' end,\\n 'recommendation','Correlate these findings with observed activity and asset context. Record an analyst disposition with an explanation; no automatic blocking.');\\nend;$$;\\nrevoke all on function ipintel.evaluate_evidence(jsonb) from public,anon,authenticated;\\n\\nCREATE OR REPLACE FUNCTION public.ipintel_api(action text, payload jsonb DEFAULT '{}'::jsonb)\\n RETURNS jsonb\\n LANGUAGE plpgsql\\n SECURITY DEFINER\\n SET search_path TO ''\\nAS $function$\\ndeclare\\n c ipintel.cases%rowtype; j ipintel.jobs%rowtype; p ipintel.providers%rowtype;\\n addr inet; cid uuid; jid uuid; ev jsonb; result_status text;\\n next_time timestamptz; requested_time timestamptz; today date := (now() at time zone 'UTC')::date;\\n result_report jsonb; evaluation jsonb; snapshot_id uuid; fp text; actor jsonb; disposition_value text;\\nbegin\\n if action='enqueue' then\\n  if length(coalesce(payload->>'request_key','')) not between 1 and 150 then raise exception 'A request key is required'; end if;\\n  addr:=(payload->>'ip')::inet;\\n  if masklen(addr)<>(case when family(addr)=4 then 32 else 128 end) then raise exception 'A single IP is required'; end if;\\n  if family(addr)=4 then\\n   if addr <<= any(array['0.0.0.0/8','10.0.0.0/8','100.64.0.0/10','127.0.0.0/8','169.254.0.0/16','172.16.0.0/12','192.0.0.0/24','192.0.2.0/24','192.88.99.0/24','192.168.0.0/16','198.18.0.0/15','198.51.100.0/24','203.0.113.0/24','224.0.0.0/4','240.0.0.0/4']::inet[]) then raise exception 'Special-use IP excluded'; end if;\\n  elsif not addr <<= '2000::/3'::inet or addr <<= any(array['2001::/23','2001:db8::/32','2002::/16','3fff::/20']::inet[]) then raise exception 'Special-use IPv6 excluded'; end if;\\n  perform pg_advisory_xact_lock(719210);\\n  select * into c from ipintel.cases where request_key=payload->>'request_key';\\n  if found then\\n   if c.ip<>addr then raise exception 'Request key already belongs to a different IP'; end if;\\n   return jsonb_build_object('case_id',c.id,'duplicate',true);\\n  end if;\\n  if (select count(*) from ipintel.cases where created_at>=now()-interval '1 day')>=200 then raise exception 'Submission budget reached; retry later';end if;\\n  insert into ipintel.cases(request_key,ip,reason) values(payload->>'request_key',addr,left(coalesce(payload->>'reason',''),2000)) returning id into cid;\\n  for p in select * from ipintel.providers order by name loop\\n   ev:=null;jid:=null;\\n   select result into ev from ipintel.cache where ip=addr and provider=p.name and expires_at>now();\\n   if ev is not null then ev:=ev||'{\\\"from_cache\\\":true}'::jsonb;\\n   elsif not p.enabled then ev:=jsonb_build_object('status','not_configured','reason','Provider is disabled');\\n   else\\n    insert into ipintel.jobs(ip,provider) values(addr,p.name)\\n     on conflict(ip,provider) where status in ('queued','running') do update set ip=excluded.ip returning id into jid;\\n   end if;\\n   insert into ipintel.case_sources(case_id,provider,job_id,evidence) values(cid,p.name,jid,ev);\\n  end loop;\\n  insert into ipintel.audit(case_id,event,details) values(cid,'submitted',jsonb_build_object('source','n8n','ip',host(addr)));\\n  return jsonb_build_object('case_id',cid,'duplicate',false,'message','Investigation recorded. Save this ID to retrieve results.');\\n elsif action='claim' then\\n  if not pg_try_advisory_xact_lock(719211) then return '{\\\"available\\\":false}'::jsonb;end if;\\n  update ipintel.jobs set status='failed',result='{\\\"status\\\":\\\"unavailable\\\",\\\"reason\\\":\\\"Worker lease expired after maximum attempts\\\"}'::jsonb,token=null\\n    where status='running' and lease_until<now() and attempts>=3;\\n  update ipintel.jobs set status='queued',due_at=now(),token=null where status='running' and lease_until<now() and attempts<3;\\n  for p in select * from ipintel.providers where enabled order by next_at,name for update loop\\n   if p.day<>today then update ipintel.providers set day=today,used=0 where name=p.name;p.used:=0;end if;\\n   if p.used>=p.daily_limit or p.next_at>now() then continue;end if;\\n   select * into j from ipintel.jobs where provider=p.name and status='queued' and due_at<=now() order by due_at,created_at limit 1 for update skip locked;\\n   if not found then continue;end if;\\n   update ipintel.jobs set status='running',attempts=attempts+1,token=gen_random_uuid(),lease_until=now()+interval '10 minutes' where id=j.id returning * into j;\\n   update ipintel.providers set used=used+1,next_at=now()+interval '60 seconds' where name=p.name;\\n   return jsonb_build_object('available',true,'job_id',j.id,'token',j.token,'ip',host(j.ip),'provider',j.provider,'attempt',j.attempts,'lease_until',j.lease_until);\\n  end loop;\\n  return '{\\\"available\\\":false}'::jsonb;\\n elsif action='finish' then\\n  perform pg_advisory_xact_lock(719211);\\n  select * into j from ipintel.jobs where id=(payload->>'job_id')::uuid for update;\\n  if not found then raise exception 'Unknown job';end if;\\n  if j.token is null or (payload->>'token') is null or j.token is distinct from (payload->>'token')::uuid then return '{\\\"accepted\\\":false,\\\"reason\\\":\\\"stale lease\\\"}'::jsonb;end if;\\n  if j.status in ('done','failed') then return '{\\\"accepted\\\":true,\\\"duplicate\\\":true}'::jsonb;end if;\\n  if j.status<>'running' or j.lease_until is null or j.lease_until<now() then return '{\\\"accepted\\\":false,\\\"reason\\\":\\\"expired lease\\\"}'::jsonb;end if;\\n  ev:=payload->'result';result_status:=ev->>'status';\\n  if result_status is null or result_status not in ('ok','not_found','unavailable','rate_limited','authentication_error') then raise exception 'Invalid result status';end if;\\n  if octet_length(ev::text)>50000 then raise exception 'Result exceeds storage limit';end if;\\n  select * into p from ipintel.providers where name=j.provider for update;\\n  if result_status in ('ok','not_found') then\\n   ev:=ev||jsonb_build_object('checked_at',now(),'from_cache',false);\\n   update ipintel.jobs set status='done',result=ev where id=j.id;\\n   insert into ipintel.cache(ip,provider,result,expires_at) values(j.ip,j.provider,ev,now()+make_interval(secs=>case when result_status='not_found' then 3600 else p.ttl_seconds end))\\n    on conflict(ip,provider) do update set result=excluded.result,expires_at=excluded.expires_at;\\n  else\\n   next_time:=now()+make_interval(secs=>case when result_status='rate_limited' then 3600 else 60*power(2,j.attempts)::int end);\\n   if payload->>'retry_at' is not null then\\n    begin requested_time:=(payload->>'retry_at')::timestamptz; next_time:=greatest(next_time,requested_time);exception when others then null;end;\\n   end if;\\n   update ipintel.providers set next_at=greatest(next_at,next_time),enabled=case when result_status='authentication_error' then false else enabled end where name=j.provider;\\n   update ipintel.jobs set status=case when j.attempts>=3 or result_status='authentication_error' then 'failed' else 'queued' end,due_at=next_time,result=ev where id=j.id;\\n  end if;\\n  update ipintel.providers set last_status=result_status where name=j.provider;\\n  insert into ipintel.audit(case_id,event,details) select case_id,'provider_result',jsonb_build_object('provider',j.provider,'status',result_status,'attempt',j.attempts) from ipintel.case_sources where job_id=j.id;\\n  return jsonb_build_object('accepted',true,'job_id',j.id,'result_status',result_status);\\n elsif action='report' then\\n  select * into c from ipintel.cases where id=(payload->>'case_id')::uuid;\\n  if not found then return '{\\\"found\\\":false}'::jsonb;end if;\\n  result_report:=jsonb_build_object('found',true,'case',to_jsonb(c),'sources',\\n   (select jsonb_object_agg(s.provider,coalesce(s.evidence,\\n      case when jobrow.status in ('done','failed') then jobrow.result else jsonb_build_object('status',jobrow.status,'attempts',jobrow.attempts,'retry_at',jobrow.due_at,'last_result',jobrow.result) end))\\n    from ipintel.case_sources s left join ipintel.jobs jobrow on jobrow.id=s.job_id where s.case_id=c.id),\\n   'timeline',(select coalesce(jsonb_agg(x),'[]'::jsonb) from (select event,details,created_at from ipintel.audit where case_id=c.id order by created_at desc limit 100)x));\\n\\n  evaluation:=ipintel.evaluate_evidence(result_report->'sources');\\n  fp:=md5(jsonb_build_object('sources',result_report->'sources','evaluation',evaluation)::text);\\n  insert into ipintel.assessments(case_id,rules_version,fingerprint,evidence,conclusion)\\n    values(c.id,'2.0',fp,result_report->'sources',evaluation) on conflict do nothing;\\n  select id into snapshot_id from ipintel.assessments where case_id=c.id and rules_version='2.0' and fingerprint=fp;\\n  return result_report||evaluation||jsonb_build_object('assessment_id',snapshot_id,\\n   'assessment_history',(select coalesce(jsonb_agg(x),'[]') from (select id,rules_version,conclusion,created_at from ipintel.assessments where case_id=c.id order by created_at desc,id desc limit 20)x),\\n   'analyst_reviews',(select coalesce(jsonb_agg(x),'[]') from (select id,disposition,explanation,actor_id,actor_name,actor_source,case_status,assessment_id,created_at from ipintel.reviews where case_id=c.id order by created_at desc,id desc limit 20)x),\\n   'generated_at',now());\\n\\n elsif action='case_update' then\\n  select * into c from ipintel.cases where id=(payload->>'case_id')::uuid for update;\\n  if not found then raise exception 'Case not found';end if;\\n  actor:=payload->'actor';disposition_value:=payload->>'disposition';\\n  if actor->>'source' is distinct from 'n8n_authenticated_user' or length(coalesce(actor->>'id',''))<1 then raise exception 'Authenticated n8n reviewer identity is required';end if;\\n  if coalesce(payload->>'status','') not in ('open','investigating','closed') then raise exception 'Invalid case status';end if;\\n  if coalesce(disposition_value,'') not in ('under_review','confirmed_malicious','confirmed_benign','insufficient_evidence','duplicate') then raise exception 'Choose an analyst disposition';end if;\\n  if payload->>'status'='closed' and disposition_value='under_review' then raise exception 'Choose a final disposition before closing the case';end if;\\n  if length(trim(coalesce(payload->>'note','')))<3 then raise exception 'An explanation is required';end if;\\n  select id into snapshot_id from ipintel.assessments where case_id=c.id order by created_at desc,id desc limit 1;\\n  insert into ipintel.reviews(case_id,assessment_id,disposition,explanation,actor_id,actor_name,actor_source,case_status)\\n   values(c.id,snapshot_id,disposition_value,left(payload->>'note',2000),left(actor->>'id',200),left(coalesce(nullif(actor->>'name',''),actor->>'id'),200),'n8n_authenticated_user',payload->>'status');\\n  update ipintel.cases set status=payload->>'status',owner_name=left(coalesce(payload->>'owner',''),100),updated_at=now() where id=c.id;\\n  insert into ipintel.audit(case_id,event,details) values(c.id,'analyst_reviewed',jsonb_build_object('previous_status',c.status,'status',payload->>'status','owner',payload->>'owner','note',left(payload->>'note',2000),'disposition',disposition_value,'actor_id',actor->>'id','actor_name',actor->>'name','assessment_id',snapshot_id));\\n  return jsonb_build_object('updated',true,'case_id',c.id,'disposition',disposition_value,'reviewed_by',actor->>'name');\\n elsif action='metrics' then\\n  return jsonb_build_object('generated_at',now(),'providers',(select jsonb_agg(to_jsonb(x)) from (select name,enabled,daily_limit,case when day=today then used else 0 end as requests_today,next_at,last_status from ipintel.providers)x),\\n   'jobs',(select coalesce(jsonb_object_agg(status,n),'{}'::jsonb) from (select status,count(*) n from ipintel.jobs group by status)x),\\n   'cases',(select coalesce(jsonb_object_agg(status,n),'{}'::jsonb) from (select status,count(*) n from ipintel.cases group by status)x),\\n   'oldest_queued_at',(select min(created_at) from ipintel.jobs where status='queued'),\\n   'cache_entries',(select count(*) from ipintel.cache),\\n   'recent_cases',(select coalesce(jsonb_agg(x),'[]'::jsonb) from (select id,host(ip) as ip,status,created_at from ipintel.cases order by created_at desc limit 25)x));\\n elsif action='configure' then\\n  if coalesce(payload->>'provider','') not in ('abuseipdb','virustotal','ipinfo') then raise exception 'Unknown provider';end if;\\n  update ipintel.providers set enabled=(payload->>'enabled')::boolean,next_at=greatest(next_at,now()) where name=payload->>'provider';\\n  return '{\\\"updated\\\":true}'::jsonb;\\n elsif action='maintenance' then\\n  delete from ipintel.cases where status='closed' and updated_at<now()-interval '90 days';\\n  delete from ipintel.cache where expires_at<now()-interval '7 days';\\n  delete from ipintel.jobs stalejob where status in ('done','failed') and created_at<now()-interval '7 days' and not exists(select 1 from ipintel.case_sources s where s.job_id=stalejob.id);\\n  return '{\\\"completed\\\":true,\\\"policy\\\":\\\"Closed cases older than 90 days; expired cache older than 7 days; unreferenced completed jobs older than 7 days\\\"}'::jsonb;\\n else raise exception 'Unknown action';\\n end if;\\nend;\\n$function$\\n\\nCREATE OR REPLACE FUNCTION public.ipintel_api(action text, payload jsonb DEFAULT '{}'::jsonb)\\n RETURNS jsonb\\n LANGUAGE plpgsql\\n SECURITY DEFINER\\n SET search_path TO ''\\nAS $function$\\ndeclare\\n c ipintel.cases%rowtype; j ipintel.jobs%rowtype; p ipintel.providers%rowtype;\\n addr inet; cid uuid; jid uuid; ev jsonb; result_status text;\\n next_time timestamptz; requested_time timestamptz; today date := (now() at time zone 'UTC')::date;\\n result_report jsonb; evaluation jsonb; snapshot_id uuid; fp text; actor jsonb; disposition_value text;\\nbegin\\n if action='enqueue' then\\n  if length(coalesce(payload->>'request_key','')) not between 1 and 150 then raise exception 'A request key is required'; end if;\\n  addr:=(payload->>'ip')::inet;\\n  if masklen(addr)<>(case when family(addr)=4 then 32 else 128 end) then raise exception 'A single IP is required'; end if;\\n  if family(addr)=4 then\\n   if addr <<= any(array['0.0.0.0/8','10.0.0.0/8','100.64.0.0/10','127.0.0.0/8','169.254.0.0/16','172.16.0.0/12','192.0.0.0/24','192.0.2.0/24','192.88.99.0/24','192.168.0.0/16','198.18.0.0/15','198.51.100.0/24','203.0.113.0/24','224.0.0.0/4','240.0.0.0/4']::inet[]) then raise exception 'Special-use IP excluded'; end if;\\n  elsif not addr <<= '2000::/3'::inet or addr <<= any(array['2001::/23','2001:db8::/32','2002::/16','3fff::/20']::inet[]) then raise exception 'Special-use IPv6 excluded'; end if;\\n  perform pg_advisory_xact_lock(719210);\\n  select * into c from ipintel.cases where request_key=payload->>'request_key';\\n  if found then\\n   if c.ip<>addr then raise exception 'Request key already belongs to a different IP'; end if;\\n   return jsonb_build_object('case_id',c.id,'duplicate',true);\\n  end if;\\n  if (select count(*) from ipintel.cases where created_at>=now()-interval '1 day')>=200 then raise exception 'Submission budget reached; retry later';end if;\\n  insert into ipintel.cases(request_key,ip,reason) values(payload->>'request_key',addr,left(coalesce(payload->>'reason',''),2000)) returning id into cid;\\n  for p in select * from ipintel.providers order by name loop\\n   ev:=null;jid:=null;\\n   select result into ev from ipintel.cache where ip=addr and provider=p.name and expires_at>now();\\n   if ev is not null then ev:=ev||'{\\\"from_cache\\\":true}'::jsonb;\\n   elsif not p.enabled then ev:=jsonb_build_object('status','not_configured','reason','Provider is disabled');\\n   else\\n    insert into ipintel.jobs(ip,provider) values(addr,p.name)\\n     on conflict(ip,provider) where status in ('queued','running') do update set ip=excluded.ip returning id into jid;\\n   end if;\\n   insert into ipintel.case_sources(case_id,provider,job_id,evidence) values(cid,p.name,jid,ev);\\n  end loop;\\n  insert into ipintel.audit(case_id,event,details) values(cid,'submitted',jsonb_build_object('source','n8n','ip',host(addr)));\\n  return jsonb_build_object('case_id',cid,'duplicate',false,'message','Investigation recorded. Save this ID to retrieve results.');\\n elsif action='claim' then\\n  if not pg_try_advisory_xact_lock(719211) then return '{\\\"available\\\":false}'::jsonb;end if;\\n  update ipintel.jobs set status='failed',result='{\\\"status\\\":\\\"unavailable\\\",\\\"reason\\\":\\\"Worker lease expired after maximum attempts\\\"}'::jsonb,token=null\\n    where status='running' and lease_until<now() and attempts>=3;\\n  update ipintel.jobs set status='queued',due_at=now(),token=null where status='running' and lease_until<now() and attempts<3;\\n  for p in select * from ipintel.providers where enabled order by next_at,name for update loop\\n   if p.day<>today then update ipintel.providers set day=today,used=0 where name=p.name;p.used:=0;end if;\\n   if p.used>=p.daily_limit or p.next_at>now() then continue;end if;\\n   select * into j from ipintel.jobs where provider=p.name and status='queued' and due_at<=now() order by due_at,created_at limit 1 for update skip locked;\\n   if not found then continue;end if;\\n   update ipintel.jobs set status='running',attempts=attempts+1,token=gen_random_uuid(),lease_until=now()+interval '10 minutes' where id=j.id returning * into j;\\n   update ipintel.providers set used=used+1,next_at=now()+interval '60 seconds' where name=p.name;\\n   return jsonb_build_object('available',true,'job_id',j.id,'token',j.token,'ip',host(j.ip),'provider',j.provider,'attempt',j.attempts,'lease_until',j.lease_until);\\n  end loop;\\n  return '{\\\"available\\\":false}'::jsonb;\\n elsif action='finish' then\\n  perform pg_advisory_xact_lock(719211);\\n  select * into j from ipintel.jobs where id=(payload->>'job_id')::uuid for update;\\n  if not found then raise exception 'Unknown job';end if;\\n  if j.token is null or (payload->>'token') is null or j.token is distinct from (payload->>'token')::uuid then return '{\\\"accepted\\\":false,\\\"reason\\\":\\\"stale lease\\\"}'::jsonb;end if;\\n  if j.status in ('done','failed') then return '{\\\"accepted\\\":true,\\\"duplicate\\\":true}'::jsonb;end if;\\n  if j.status<>'running' or j.lease_until is null or j.lease_until<now() then return '{\\\"accepted\\\":false,\\\"reason\\\":\\\"expired lease\\\"}'::jsonb;end if;\\n  ev:=payload->'result';result_status:=ev->>'status';\\n  if result_status is null or result_status not in ('ok','not_found','unavailable','rate_limited','authentication_error') then raise exception 'Invalid result status';end if;\\n  if octet_length(ev::text)>50000 then raise exception 'Result exceeds storage limit';end if;\\n  select * into p from ipintel.providers where name=j.provider for update;\\n  if result_status in ('ok','not_found') then\\n   ev:=ev||jsonb_build_object('checked_at',now(),'from_cache',false);\\n   update ipintel.jobs set status='done',result=ev where id=j.id;\\n   insert into ipintel.cache(ip,provider,result,expires_at) values(j.ip,j.provider,ev,now()+make_interval(secs=>case when result_status='not_found' then 3600 else p.ttl_seconds end))\\n    on conflict(ip,provider) do update set result=excluded.result,expires_at=excluded.expires_at;\\n  else\\n   next_time:=now()+make_interval(secs=>case when result_status='rate_limited' then 3600 else 60*power(2,j.attempts)::int end);\\n   if payload->>'retry_at' is not null then\\n    begin requested_time:=(payload->>'retry_at')::timestamptz; next_time:=greatest(next_time,requested_time);exception when others then null;end;\\n   end if;\\n   update ipintel.providers set next_at=greatest(next_at,next_time),enabled=case when result_status='authentication_error' then false else enabled end where name=j.provider;\\n   update ipintel.jobs set status=case when j.attempts>=3 or result_status='authentication_error' then 'failed' else 'queued' end,due_at=next_time,result=ev where id=j.id;\\n  end if;\\n  update ipintel.providers set last_status=result_status where name=j.provider;\\n  insert into ipintel.audit(case_id,event,details) select case_id,'provider_result',jsonb_build_object('provider',j.provider,'status',result_status,'attempt',j.attempts) from ipintel.case_sources where job_id=j.id;\\n  return jsonb_build_object('accepted',true,'job_id',j.id,'result_status',result_status);\\n elsif action='report' then\\n  select * into c from ipintel.cases where id=(payload->>'case_id')::uuid;\\n  if not found then return '{\\\"found\\\":false}'::jsonb;end if;\\n  result_report:=jsonb_build_object('found',true,'case',to_jsonb(c),'sources',\\n   (select jsonb_object_agg(s.provider,coalesce(s.evidence,\\n      case when jobrow.status in ('done','failed') then jobrow.result else jsonb_build_object('status',jobrow.status,'attempts',jobrow.attempts,'retry_at',jobrow.due_at,'last_result',jobrow.result) end))\\n    from ipintel.case_sources s left join ipintel.jobs jobrow on jobrow.id=s.job_id where s.case_id=c.id),\\n   'timeline',(select coalesce(jsonb_agg(x),'[]'::jsonb) from (select event,details,created_at from ipintel.audit where case_id=c.id order by created_at desc limit 100)x));\\n\\n  evaluation:=ipintel.evaluate_evidence(result_report->'sources');\\n  fp:=md5(jsonb_build_object('sources',result_report->'sources','evaluation',evaluation)::text);\\n  insert into ipintel.assessments(case_id,rules_version,fingerprint,evidence,conclusion)\\n    values(c.id,'2.0',fp,result_report->'sources',evaluation) on conflict do nothing;\\n  select id into snapshot_id from ipintel.assessments where case_id=c.id and rules_version='2.0' and fingerprint=fp;\\n  return result_report||evaluation||jsonb_build_object('assessment_id',snapshot_id,\\n   'assessment_history',(select coalesce(jsonb_agg(x),'[]') from (select id,rules_version,conclusion,created_at from ipintel.assessments where case_id=c.id order by created_at desc,id desc limit 20)x),\\n   'analyst_reviews',(select coalesce(jsonb_agg(x),'[]') from (select id,disposition,explanation,actor_id,actor_name,actor_source,case_status,assessment_id,created_at from ipintel.reviews where case_id=c.id order by created_at desc,id desc limit 20)x),\\n   'generated_at',now());\\n\\n elsif action='case_update' then\\n  select * into c from ipintel.cases where id=(payload->>'case_id')::uuid for update;\\n  if not found then raise exception 'Case not found';end if;\\n  actor:=payload->'actor';disposition_value:=payload->>'disposition';\\n  if actor->>'source' is distinct from 'n8n_authenticated_user' or length(coalesce(actor->>'id',''))<1 then raise exception 'Authenticated n8n reviewer identity is required';end if;\\n  if coalesce(payload->>'status','') not in ('open','investigating','closed') then raise exception 'Invalid case status';end if;\\n  if coalesce(disposition_value,'') not in ('under_review','confirmed_malicious','confirmed_benign','insufficient_evidence','duplicate') then raise exception 'Choose an analyst disposition';end if;\\n  if payload->>'status'='closed' and disposition_value='under_review' then raise exception 'Choose a final disposition before closing the case';end if;\\n  if length(trim(coalesce(payload->>'note','')))<3 then raise exception 'An explanation is required';end if;\\n  select id into snapshot_id from ipintel.assessments where case_id=c.id order by created_at desc,id desc limit 1;\\n  if snapshot_id is null then raise exception 'View the investigation report before recording a review so the decision can reference a saved assessment';end if;\\n  insert into ipintel.reviews(case_id,assessment_id,disposition,explanation,actor_id,actor_name,actor_source,case_status)\\n   values(c.id,snapshot_id,disposition_value,left(payload->>'note',2000),left(actor->>'id',200),left(coalesce(nullif(actor->>'name',''),actor->>'id'),200),'n8n_authenticated_user',payload->>'status');\\n  update ipintel.cases set status=payload->>'status',owner_name=left(coalesce(payload->>'owner',''),100),updated_at=now() where id=c.id;\\n  insert into ipintel.audit(case_id,event,details) values(c.id,'analyst_reviewed',jsonb_build_object('previous_status',c.status,'status',payload->>'status','owner',payload->>'owner','note',left(payload->>'note',2000),'disposition',disposition_value,'actor_id',actor->>'id','actor_name',actor->>'name','assessment_id',snapshot_id));\\n  return jsonb_build_object('updated',true,'case_id',c.id,'disposition',disposition_value,'reviewed_by',actor->>'name');\\n elsif action='metrics' then\\n  return jsonb_build_object('generated_at',now(),'providers',(select jsonb_agg(to_jsonb(x)) from (select name,enabled,daily_limit,case when day=today then used else 0 end as requests_today,next_at,last_status from ipintel.providers)x),\\n   'jobs',(select coalesce(jsonb_object_agg(status,n),'{}'::jsonb) from (select status,count(*) n from ipintel.jobs group by status)x),\\n   'cases',(select coalesce(jsonb_object_agg(status,n),'{}'::jsonb) from (select status,count(*) n from ipintel.cases group by status)x),\\n   'oldest_queued_at',(select min(created_at) from ipintel.jobs where status='queued'),\\n   'cache_entries',(select count(*) from ipintel.cache),\\n   'recent_cases',(select coalesce(jsonb_agg(x),'[]'::jsonb) from (select id,host(ip) as ip,status,created_at from ipintel.cases order by created_at desc limit 25)x));\\n elsif action='configure' then\\n  if coalesce(payload->>'provider','') not in ('abuseipdb','virustotal','ipinfo') then raise exception 'Unknown provider';end if;\\n  update ipintel.providers set enabled=(payload->>'enabled')::boolean,next_at=greatest(next_at,now()) where name=payload->>'provider';\\n  return '{\\\"updated\\\":true}'::jsonb;\\n elsif action='maintenance' then\\n  delete from ipintel.cases where status='closed' and updated_at<now()-interval '90 days';\\n  delete from ipintel.cache where expires_at<now()-interval '7 days';\\n  delete from ipintel.jobs stalejob where status in ('done','failed') and created_at<now()-interval '7 days' and not exists(select 1 from ipintel.case_sources s where s.job_id=stalejob.id);\\n  return '{\\\"completed\\\":true,\\\"policy\\\":\\\"Closed cases older than 90 days; expired cache older than 7 days; unreferenced completed jobs older than 7 days\\\"}'::jsonb;\\n else raise exception 'Unknown action';\\n end if;\\nend;\\n$function$\\n\",\"steps\":[\"Run Operator console with Console action = setup. Copy supabase_sql into the Supabase SQL editor and execute it once.\",\"Set the project URL once in System configuration.\",\"Attach the shared Supabase backend credential to every RPC node. Use templated Custom Auth with apikey header for a backend secret; legacy service_role JWT also requires Authorization: Bearer <same JWT>.\",\"Attach provider credentials to worker - Lookup AbuseIPDB, worker - Lookup VirusTotal, worker - Lookup IPinfo Lite.\",\"Set Console action = enable; edit enable - Provider choice to enable one configured provider at a time.\",\"Use Investigation portal: submit with ip and reason; report with case_id; case with case_id, status, owner and note.\",\"Console actions: demo, setup, ops, maintenance, enable. Default demo requires no credentials.\",\"Configure portal access control before exposing it. Complete live SQL and concurrency acceptance tests, then activate the unified workflow.\",\"Queue schedule processes one eligible provider job per minute. Supabase enforces request budgets and retries.\",\"Previous separate workflows are reference drafts; this workflow does not call them.\",\"Read the report before recording an analyst decision. Reviews require signed-in n8n identity and link to the latest saved assessment.\"],\"acceptance_tests\":[\"Repeated request key returns same case ID.\",\"Two simultaneous claims never return the same active lease.\",\"Expired token cannot overwrite a newer result.\",\"429 preserves Retry-After and defers subsequent calls.\",\"100 requests/provider/UTC day stops further requests.\",\"Missing provider credentials yield incomplete evidence, never safe.\",\"Case closure records a note and owner.\"],\"limitations\":[\"Live Supabase SQL and concurrency tests require credentials.\",\"Wazuh is a later integration.\",\"Notifications are not configured.\",\"Provider budgets cover this system only; avoid sharing keys with other active automations.\"]}}];"
+      },
+      "id": "6c787255-2ea8-432c-b911-253d4ce94e83",
+      "name": "setup - Generate setup package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## IP Intelligence — Combined System\nOne workflow, three entrances: Operator console, Investigation portal, Queue schedule.\n\nConsole action: demo (default), setup, ops, maintenance, enable. Set action in Console action, then execute Operator console.\n\nRun setup to produce Supabase SQL. Set the project URL once in System configuration. Attach one shared Supabase backend credential to RPC nodes. Add the three provider credentials in Enrich queued IP. Use enable to configure one provider at a time using enable - Provider choice.\n\nPortal actions: submit (IP and reason), report (case_id), case (case_id, status, owner and note).\n\nSupabase budgets, leases, caching, deduplication, retries and audit history are preserved. Credentials stay in n8n credentials, never input fields. All providers start disabled. Configure form access before exposing the portal. Live SQL/concurrency tests require credentials.\n\nThe earlier separate workflows are reference drafts; this combined workflow runs independently and does not call them.",
+        "height": 740,
+        "width": 760
+      },
+      "id": "3e67cabf-441e-4109-aa9e-feebd5f0c466",
+      "name": "Start here",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        2176
+      ]
+    },
+    {
+      "id": "31649995-1eeb-43f0-a61e-fa65b776e6d2",
+      "name": "Collect investigation details",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        160,
+        1100
+      ],
+      "parameters": {
+        "operation": "page",
+        "defineForm": "json",
+        "jsonOutput": "={{ JSON.stringify($json.action === 'submit' ? [{\"fieldLabel\":\"IP address\",\"fieldName\":\"ip\",\"fieldType\":\"text\",\"placeholder\":\"For example, 8.8.8.8\",\"requiredField\":true},{\"fieldLabel\":\"Reason for investigation (optional)\",\"fieldName\":\"reason\",\"fieldType\":\"textarea\",\"requiredField\":false}] : $json.action === 'report' ? [{\"fieldLabel\":\"Investigation ID\",\"fieldName\":\"case_id\",\"fieldType\":\"text\",\"placeholder\":\"Paste the ID returned when you submitted the IP\",\"requiredField\":true}] : [{\"fieldLabel\":\"Investigation ID\",\"fieldName\":\"case_id\",\"fieldType\":\"text\",\"requiredField\":true},{\"fieldLabel\":\"Case status\",\"fieldName\":\"status\",\"fieldType\":\"dropdown\",\"requiredField\":true,\"fieldOptions\":{\"values\":[{\"option\":\"open\"},{\"option\":\"investigating\"},{\"option\":\"closed\"}]}},{\"fieldLabel\":\"Analyst disposition\",\"fieldName\":\"disposition\",\"fieldType\":\"dropdown\",\"requiredField\":true,\"fieldOptions\":{\"values\":[{\"option\":\"Under review\"},{\"option\":\"Confirmed malicious activity\"},{\"option\":\"Confirmed benign activity\"},{\"option\":\"Insufficient evidence\"},{\"option\":\"Duplicate investigation\"}]}},{\"fieldLabel\":\"Assigned analyst (optional)\",\"fieldName\":\"owner\",\"fieldType\":\"text\",\"requiredField\":false},{\"fieldLabel\":\"Explain your decision\",\"fieldName\":\"note\",\"fieldType\":\"textarea\",\"requiredField\":true}]) }}",
+        "options": {
+          "formTitle": "={{ $json.action === 'submit' ? 'Investigate an IP' : $json.action === 'report' ? 'View investigation report' : 'Update a case' }}",
+          "formDescription": "={{ $json.action === 'case' ? 'Read the report first. Your decision links to its latest saved assessment and is attributed to your signed-in n8n account. Assignment is separate from reviewer identity.' : 'Complete the details below to continue.' }}",
+          "buttonLabel": "Continue",
+          "appendAttribution": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "submit - Check connection settings": {
+      "main": [
+        [
+          {
+            "node": "submit - Validate public IP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "submit - Validate public IP": {
+      "main": [
+        [
+          {
+            "node": "submit - Prepare submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "submit - Prepare submission": {
+      "main": [
+        [
+          {
+            "node": "submit - Queue investigation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "submit - Queue investigation": {
+      "main": [
+        [
+          {
+            "node": "submit - Render result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "submit - Render result": {
+      "main": [
+        [
+          {
+            "node": "submit - Display result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker - Check connection settings": {
+      "main": [
+        [
+          {
+            "node": "worker - Claim one eligible job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker - Claim one eligible job": {
+      "main": [
+        [
+          {
+            "node": "worker - Check claimed job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker - Check claimed job": {
+      "main": [
+        [
+          {
+            "node": "worker - AbuseIPDB job?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker - AbuseIPDB job?": {
+      "main": [
+        [
+          {
+            "node": "worker - Lookup AbuseIPDB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "worker - VirusTotal job?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker - Lookup AbuseIPDB": {
+      "main": [
+        [
+          {
+            "node": "worker - Normalize provider evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker - VirusTotal job?": {
+      "main": [
+        [
+          {
+            "node": "worker - Lookup VirusTotal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "worker - Lookup IPinfo Lite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker - Normalize provider evidence": {
+      "main": [
+        [
+          {
+            "node": "worker - Commit result and release job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker - Lookup VirusTotal": {
+      "main": [
+        [
+          {
+            "node": "worker - Normalize provider evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker - Lookup IPinfo Lite": {
+      "main": [
+        [
+          {
+            "node": "worker - Normalize provider evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "report - Check connection settings": {
+      "main": [
+        [
+          {
+            "node": "report - Read evidence and timeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "report - Read evidence and timeline": {
+      "main": [
+        [
+          {
+            "node": "report - Assess evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "report - Assess evidence": {
+      "main": [
+        [
+          {
+            "node": "report - Render result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "report - Render result": {
+      "main": [
+        [
+          {
+            "node": "report - Display result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "case - Check connection settings": {
+      "main": [
+        [
+          {
+            "node": "case - Record case update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "case - Record case update": {
+      "main": [
+        [
+          {
+            "node": "case - Render result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "case - Render result": {
+      "main": [
+        [
+          {
+            "node": "case - Display result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ops - Check connection settings": {
+      "main": [
+        [
+          {
+            "node": "ops - Read operational metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ops - Read operational metrics": {
+      "main": [
+        [
+          {
+            "node": "ops - Operations report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "maintenance - Check connection settings": {
+      "main": [
+        [
+          {
+            "node": "maintenance - Apply retention policy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enable - Provider choice": {
+      "main": [
+        [
+          {
+            "node": "enable - Check connection settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enable - Check connection settings": {
+      "main": [
+        [
+          {
+            "node": "enable - Set provider availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "demo - Synthetic evidence": {
+      "main": [
+        [
+          {
+            "node": "demo - Assess evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "demo - Assess evidence": {
+      "main": [
+        [
+          {
+            "node": "demo - Render result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Operator console": {
+      "main": [
+        [
+          {
+            "node": "Console action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Console action": {
+      "main": [
+        [
+          {
+            "node": "System configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "System configuration": {
+      "main": [
+        [
+          {
+            "node": "Route system action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate portal action": {
+      "main": [
+        [
+          {
+            "node": "System configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue schedule": {
+      "main": [
+        [
+          {
+            "node": "Queue action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue action": {
+      "main": [
+        [
+          {
+            "node": "System configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route system action": {
+      "main": [
+        [
+          {
+            "node": "setup - Generate setup package",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "submit - Check connection settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "worker - Check connection settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "report - Check connection settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "case - Check connection settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ops - Check connection settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "maintenance - Check connection settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "enable - Provider choice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "demo - Synthetic evidence",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject unsupported command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Investigation portal": {
+      "main": [
+        [
+          {
+            "node": "Collect investigation details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect investigation details": {
+      "main": [
+        [
+          {
+            "node": "Validate portal action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "executionTimeout": 180,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "nodeGroups": [
+    {
+      "id": "93c99796-c553-4764-a628-f7a73e8855da",
+      "name": "Setup package",
+      "nodeNames": [
+        "setup - Generate setup package",
+        "Start here"
+      ],
+      "description": "Combined system: setup package."
+    },
+    {
+      "id": "29d5c6f9-0a74-423c-8ac9-fad5e6955ec4",
+      "name": "Submit investigation",
+      "nodeNames": [
+        "submit - Check connection settings",
+        "submit - Validate public IP",
+        "submit - Prepare submission",
+        "submit - Queue investigation",
+        "submit - Render result",
+        "submit - Display result"
+      ],
+      "description": "Combined system: submit investigation."
+    },
+    {
+      "id": "3f33a8ad-d7c9-4a38-aacc-25afdbcbc194",
+      "name": "Enrich queued IP",
+      "nodeNames": [
+        "worker - Check connection settings",
+        "worker - Claim one eligible job",
+        "worker - Check claimed job",
+        "worker - AbuseIPDB job?",
+        "worker - Lookup AbuseIPDB",
+        "worker - Normalize provider evidence",
+        "worker - VirusTotal job?",
+        "worker - Lookup VirusTotal",
+        "worker - Lookup IPinfo Lite",
+        "worker - Commit result and release job"
+      ],
+      "description": "Combined system: enrich queued ip."
+    },
+    {
+      "id": "48323e4c-b211-4e2d-9d5a-d8e767801500",
+      "name": "Review evidence",
+      "nodeNames": [
+        "report - Check connection settings",
+        "report - Read evidence and timeline",
+        "report - Assess evidence",
+        "report - Render result",
+        "report - Display result"
+      ],
+      "description": "Combined system: review evidence."
+    },
+    {
+      "id": "a3682cc8-49d7-4c99-bb1e-95f3b0c0b9d9",
+      "name": "Manage case",
+      "nodeNames": [
+        "case - Check connection settings",
+        "case - Record case update",
+        "case - Render result",
+        "case - Display result"
+      ],
+      "description": "Combined system: manage case."
+    },
+    {
+      "id": "8eea4aa5-b59f-4930-a512-328caf6cf201",
+      "name": "Monitor operations",
+      "nodeNames": [
+        "ops - Check connection settings",
+        "ops - Read operational metrics",
+        "ops - Operations report"
+      ],
+      "description": "Combined system: monitor operations."
+    },
+    {
+      "id": "e11d5948-a675-42a0-97ed-27f4839a0e60",
+      "name": "Apply retention",
+      "nodeNames": [
+        "maintenance - Check connection settings",
+        "maintenance - Apply retention policy"
+      ],
+      "description": "Combined system: apply retention."
+    },
+    {
+      "id": "245ba714-7c69-4710-8a1c-e27ea78be804",
+      "name": "Control providers",
+      "nodeNames": [
+        "enable - Provider choice",
+        "enable - Check connection settings",
+        "enable - Set provider availability"
+      ],
+      "description": "Combined system: control providers."
+    },
+    {
+      "id": "1f6841c7-b06c-47b2-a2cc-6c08cc52c520",
+      "name": "Offline demonstration",
+      "nodeNames": [
+        "demo - Synthetic evidence",
+        "demo - Assess evidence",
+        "demo - Render result"
+      ],
+      "description": "Combined system: offline demonstration."
+    },
+    {
+      "id": "9f4fac5e-9ed8-4317-92f1-16a78dd9d6b5",
+      "name": "Choose console task",
+      "nodeNames": [
+        "Console action"
+      ],
+      "description": "Combined system: choose console task."
+    },
+    {
+      "id": "f87ba8a7-d983-4074-8cc0-0223047607f4",
+      "name": "Accept portal request",
+      "nodeNames": [
+        "Collect investigation details",
+        "Validate portal action"
+      ],
+      "description": "Shows only the fields needed for the selected task and preserves answers across both pages."
+    },
+    {
+      "id": "6c510bf1-ce1f-4812-bad9-6340a451afbd",
+      "name": "Prepare queue tick",
+      "nodeNames": [
+        "Queue action"
+      ],
+      "description": "Combined system: prepare queue tick."
+    },
+    {
+      "id": "8ca2c6f5-2cb6-4db8-a1e7-48c1185b7f7f",
+      "name": "Dispatch system task",
+      "nodeNames": [
+        "System configuration",
+        "Route system action"
+      ],
+      "description": "Combined system: dispatch system task."
+    },
+    {
+      "id": "522f292a-c23d-41b1-8413-c14264d97d74",
+      "name": "Reject invalid task",
+      "nodeNames": [
+        "Reject unsupported command"
+      ],
+      "description": "Combined system: reject invalid task."
+    }
+  ],
+  "active": false
+}
