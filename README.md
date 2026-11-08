@@ -8,7 +8,7 @@ An IP investigation system built as **one n8n workflow**, with hosted Supabase p
 
 [Animated documentation](docs/site/index.html) · [Architecture](docs/ARCHITECTURE.md) · [Setup](docs/SETUP.md) · [Operations](docs/OPERATIONS.md) · [Security](docs/SECURITY.md) · [Verification](docs/VERIFICATION.md)
 
-> This is a working personal security-automation project, not a certification of enterprise readiness. Live integrations and targeted acceptance tests have passed. No large-scale load benchmark, penetration test, or independent audit has been performed.
+> Live integrations and targeted acceptance tests have passed. Production throughput, independent security assurance, and disaster recovery remain validation milestones. See the verification guide for the scope of recorded evidence.
 
 ![Investigation architecture](docs/assets/architecture.svg)
 
@@ -70,7 +70,7 @@ This is an example from a dated investigation, not a current verdict about that 
 1. Create an n8n instance and a hosted Supabase project.
 2. Read [SETUP.md](docs/SETUP.md), particularly the migration-history warning.
 3. Import [the sanitized workflow](workflows/ip-intelligence-unified.sanitized.json).
-4. Apply the database schema/migrations appropriate to your target environment.
+4. Apply the database schema/migrations appropriate to the target environment.
 5. Connect four n8n credentials and set the Supabase project URL.
 6. Configure portal authentication, verify the isolated test paths, then publish.
 

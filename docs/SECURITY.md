@@ -23,10 +23,10 @@ Snapshot fingerprints use MD5 for deduplication. They are not signatures or a ta
 
 The portable workflow export removes credential bindings and pin data, blanks the backend URL and imports inactive. Credentials must be created and attached in the target n8n instance. Local credential-helper connection files, `.env` files, private keys, Python caches and runtime artifacts are excluded from Git. Ignore rules do not replace secret review: inspect every staged change before committing.
 
-Rotate any key previously shared in chat. Keep replacements in n8n's credential store. Restrict access to n8n's encryption key, database backups and execution history. Execution logs can contain IPs, reasons and provider evidence; configure n8n retention and access controls to match your privacy requirements. Do not put raw credentials in example payloads or screenshots.
+Rotate exposed credentials and keep replacements in n8n's credential store. Restrict access to n8n's encryption key, database backups and execution history. Execution logs can contain IPs, reasons and provider evidence; configure retention and access controls according to deployment requirements. Example payloads and screenshots must exclude credentials.
 
 ## Remaining assurance work
 
-This is a working personal project, not a certified security product. There has been no independent penetration test, production load benchmark or disaster-recovery certification. Before shared deployment, add a documented access review, retention policy, backup restoration exercise, audit monitoring and tests for your reverse proxy/session configuration. Verify free-tier API use terms for your intended deployment.
+Independent penetration testing, production load benchmarking and disaster-recovery exercises remain planned assurance work. Shared deployments require a documented access review, retention policy, backup restoration exercise, audit monitoring and verification of reverse proxy and session configuration. Provider API terms and allowances must be reviewed for the intended deployment.
 
-Report sensitive defects privately to the repository owner; no public security contact or disclosure service is configured in this local repository.
+Report sensitive defects privately to the repository owner; no public security contact or disclosure service is configured in this repository.

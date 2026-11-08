@@ -17,7 +17,7 @@ The analyst workflow tests deliberately exercise rejection paths. An execution r
 
 ## Reproducing checks
 
-Read each SQL test before execution. These suites require privileged database access and exercise writes inside transactions before rolling back; they are not read-only monitoring queries. Run against a disposable environment first. Never paste database credentials into shell history. Supply credentials using your database client's protected connection mechanism.
+Read each SQL test before execution. These suites require privileged database access and exercise writes inside transactions before rolling back; they are not read-only monitoring queries. Run against a disposable environment first. Never paste database credentials into shell history. Supply credentials using the database client's protected connection mechanism.
 
 To validate an import, attach all four credentials, configure the backend URL, inspect operator metrics, submit one intended public IP, let the queue run, retrieve the saved report and perform an authenticated explained review. Inspect both provider outcomes and the stored assessment/review linkage. Test an unavailable provider separately and verify a useful partial report. Avoid spending provider quota on repeated checks of unchanged behavior.
 

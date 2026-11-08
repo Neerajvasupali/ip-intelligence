@@ -35,6 +35,6 @@ The owner field is assignment metadata. The review actor comes from the authenti
 
 The maintenance path performs bounded retention cleanup. Current policy removes closed cases last updated more than 90 days ago and deletes expired cache older than seven days; related case records may cascade when a case is removed. Confirm the deployed SQL before changing retention. Append-only review triggers do not prevent authorized retention deletion.
 
-Back up the database and n8n configuration through your own approved backup process. Protect and back up the n8n encryption key separately: a workflow export does not contain the saved credentials. Restore and verify database permissions, migrations and credential bindings before enabling a restored schedule. Keep only one intended production worker active.
+Back up the database and n8n configuration through an approved backup process. Protect and back up the n8n encryption key separately: a workflow export does not contain the saved credentials. Restore and verify database permissions, migrations and credential bindings before enabling a restored schedule. Keep only one intended production worker active.
 
 Before a change, export a sanitized workflow and record the deployed version. Apply migrations deliberately; the local consolidated baseline and historical deployed ledger differ (see [setup](SETUP.md)). Re-run relevant transactional tests in an isolated environment. Do not claim zero downtime or durable recovery until restoration has been exercised.
